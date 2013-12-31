@@ -117,28 +117,68 @@ int process_input(std::ifstream &fin)
 
     int64_t remaining = file_length;
     while(remaining>=(int64_t)sizeof(DltStorageHeader)){
+        DltMessage msg;
+        msg.found_serialheader=0;
+        msg.resync_offset=0;
+        msg.storageheader = (DltStorageHeader *)&msg.headerbuffer[0];
+        msg.standardheader = (DltStandardHeader *)&msg.headerbuffer[sizeof(DltStorageHeader)];
+        msg.extendedheader = (DltExtendedHeader *)&msg.headerbuffer[sizeof(DltStorageHeader)+sizeof(DltStandardHeader)];
+        msg.headersize = -1; // not calculated yet
+        msg.datasize=-1; // not calculated yet
+        
         // check for dlt storage header:
-        DltStorageHeader sh;
-        fin.read((char*)&sh, sizeof(sh));
-        remaining-= sizeof(sh);
-        if (0 == memcmp(sh.pattern, DLT_ID4_ID, sizeof(sh.pattern))){
+        fin.read((char*)msg.storageheader, sizeof(*msg.storageheader));
+        remaining-= sizeof(*msg.storageheader);
+        if (0 == memcmp(msg.storageheader->pattern, DLT_ID4_ID, sizeof(msg.storageheader->pattern))){
             // now read dlt header:
-            DltStandardHeader hstd;
-            if (remaining >= sizeof(hstd)){
-                fin.read((char*)&hstd, sizeof(hstd));
-                remaining -= sizeof(hstd);
+            if (remaining >= sizeof(*msg.standardheader)){
+                fin.read((char*)msg.standardheader, sizeof(*msg.standardheader));
+                remaining -= sizeof(*msg.standardheader);
                 // verify header (somehow)
-                uint16_t len = DLT_BETOH_16(hstd.len); // fixme: why that? the macro should work! DLT_ENDIAN_GET_16(hstd.htyp, hstd.len); // len is without storage header (but with stdh)
-                if (len<=sizeof(hstd)){
+                uint16_t len = DLT_BETOH_16(msg.standardheader->len); // fixme: why that? the macro should work! DLT_ENDIAN_GET_16(hstd.htyp, hstd.len); // len is without storage header (but with stdh)
+                if (len<=sizeof(*msg.standardheader)){
                     cerr << "msg len <= sizeof(DltStandardHeader). Stopping processing this file!\n";
                     remaining = -4;
                 }else{
-                    len -= sizeof(hstd); // standard header already read from this message
+                    len -= sizeof(*msg.standardheader); // standard header already read from this message
+                    
+                    // extended header?
+                    if (DLT_IS_HTYP_WEID(msg.standardheader->htyp))
+                    {
+                        fin.read(msg.headerextra.ecu, DLT_ID_SIZE);
+                        remaining -= DLT_ID_SIZE;
+                        len -= DLT_ID_SIZE;
+                    }
+                    
+                    if (DLT_IS_HTYP_WSID(msg.standardheader->htyp))
+                    {
+                        fin.read((char*)&(msg.headerextra.seid), DLT_SIZE_WSID);
+                        msg.headerextra.seid = DLT_BETOH_32(msg.headerextra.seid);
+                        remaining -= DLT_SIZE_WSID;
+                        len -= DLT_SIZE_WSID;
+                    }
+                    
+                    if (DLT_IS_HTYP_WTMS(msg.standardheader->htyp))
+                    {
+                        fin.read((char*)&(msg.headerextra.tmsp), DLT_SIZE_WTMS);
+                        msg.headerextra.tmsp = DLT_BETOH_32(msg.headerextra.tmsp);
+                        remaining -= DLT_SIZE_WTMS;
+                        len -= DLT_SIZE_WTMS;
+                    }
+                    
+                    // has extended header?
+                    if (DLT_IS_HTYP_UEH(msg.standardheader->htyp)){
+                        fin.read((char*)msg.extendedheader, sizeof(*msg.extendedheader));
+                        remaining -= sizeof(*msg.extendedheader);
+                        len -= sizeof(*msg.extendedheader);
+                    }
+                    
                     // read remaining message:
                     if (remaining >= len){
-                        char *msgdata = new char [len];
-                        fin.read(msgdata, len);
-                        delete msgdata;
+                        msg.databuffer = new unsigned char [len];
+                        msg.databuffersize = len;
+                        fin.read((char*)msg.databuffer, len);
+                        delete msg.databuffer;
                         remaining -= len;
                         nr_msgs++;
                     }else{
@@ -152,7 +192,8 @@ int process_input(std::ifstream &fin)
             }
         }else{
             cerr << "no proper DLT pattern found! Stop processing this file!\n";
-            cerr << " found: <" << sh.pattern[0] << sh.pattern[1] << sh.pattern[2] << sh.pattern[3] << ">\n";
+            cerr << " found: <" << msg.storageheader->pattern[0] << msg.storageheader->pattern[1]
+              << msg.storageheader->pattern[2] << msg.storageheader->pattern[3] << ">\n";
             remaining = -1;
         }
         

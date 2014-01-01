@@ -10,6 +10,8 @@
 #include <fstream>
 #include <list>
 #include <map>
+#include <vector>
+
 #include <assert.h>
 #include <time.h>
 
@@ -39,6 +41,7 @@ public:
     Lifecycle(const DltMessage &);
     void debug_print() const;
     bool fitsin(const DltMessage &); // function is non const. modifies the lifecycle
+    int64_t calc_min_time() const;
     // member vars:
     uint32_t sec_begin; // secs since 1.1.1970 for begin of LC
     uint32_t sec_end; // secs since ... for end of LC
@@ -60,6 +63,7 @@ public:
     OverallLC():sec_begin(0), sec_end(0) {};
     OverallLC(const Lifecycle&);
     bool expand_if_intersects(const Lifecycle &);
+    bool output_to_fstream(std::ofstream &f);
     void debug_print() const;
     // member vars:
     uint32_t sec_begin;
@@ -69,14 +73,23 @@ public:
 };
 typedef std::list<OverallLC> LIST_OF_OLCS;
 
+typedef struct{
+    LIST_OF_MSGS::iterator it;
+    LIST_OF_MSGS::iterator end;
+    int64_t min_time;
+} LC_it;
+typedef std::vector<LC_it> VEC_OF_LC_it;
+
 /* prototype declarations */
 int process_input(std::ifstream &);
 int process_message(DltMessage *msg);
+int output_message(DltMessage *msg, std::ofstream &f);
 int determine_lcs(ECU_Info &);
 int sort_msgs_lcs(ECU_Info &);
 void debug_print(const LIST_OF_LCS &);
 void debug_print(const LIST_OF_OLCS &);
 int determine_overall_lcs();
+std::ofstream *get_ofstream(int cnt, std::string &name);
 
 
 MAP_OF_ECUS map_ecus;
@@ -88,6 +101,7 @@ int main(int argc, char * argv[])
     
     int c, option_index;
     int do_split=0; // by default don't split output files per lifecycle
+    std::string ofilename ("dlt_sorted.dlt");
     
     static struct option long_options[] =
     {
@@ -124,7 +138,8 @@ int main(int argc, char * argv[])
                 if(verbose) cout << " splitting output files by lifecycles\n";
                 break;
             case 'f':
-                if(verbose) cout << " using <" << optarg << "> as output file name\n";
+                ofilename=std::string (optarg);
+                if(verbose) cout << " using <" << ofilename<< "> as output file name\n";
                 break;
             default:
                 abort();
@@ -193,11 +208,24 @@ int main(int argc, char * argv[])
         debug_print(list_olcs);
     }
     
-    /* determine time-offset between ECUs:
-     we have two ways:
-     a) by using the abs timestamp within the DltStorageHeader
-     b) by using the rel cpu timestamps and some sync markers (Resp/Answer) from ECU to ECU
+    /* now output to file
+     if do_split is set we have to maintain a new file for each olc.
+     otherwise just output to a single file.
      */
+    std::ofstream *f=0;
+    int f_cnt=1;
+    if (!do_split)
+        f=get_ofstream(0, ofilename);
+    
+    for (LIST_OF_OLCS::iterator it=list_olcs.begin(); it!= list_olcs.end(); ++it){
+        if (do_split){
+            if (f) f->close();
+            f=get_ofstream(f_cnt, ofilename);
+        }
+        (*it).output_to_fstream(*f); // todo error handling
+        ++f_cnt;
+    }
+    if (f) f->close();
     
     // free memory:
     // tbd!
@@ -354,6 +382,41 @@ int process_message(DltMessage *msg)
     return 0; // success
 }
 
+int output_message(DltMessage *msg, std::ofstream &f)
+{
+    assert(msg);
+    // output storageheader
+    f.write((char*)(msg->storageheader), sizeof(*msg->storageheader));
+    // output standard header
+    f.write((char*)(msg->standardheader), sizeof(*msg->standardheader));
+    // output extraheader
+    if (DLT_IS_HTYP_WEID(msg->standardheader->htyp))
+    {
+        f.write(msg->headerextra.ecu, DLT_SIZE_WEID); // DLT_ID_SIZE);
+    }
+    
+    if (DLT_IS_HTYP_WSID(msg->standardheader->htyp))
+    {
+        msg->headerextra.seid = DLT_HTOBE_32(msg->headerextra.seid);
+        f.write((char*)&(msg->headerextra.seid), DLT_SIZE_WSID);
+    }
+    
+    if (DLT_IS_HTYP_WTMS(msg->standardheader->htyp))
+    {
+        msg->headerextra.tmsp = DLT_HTOBE_32(msg->headerextra.tmsp);
+        f.write((char*)&(msg->headerextra.tmsp), DLT_SIZE_WTMS);
+    }
+    // output extended header
+    if (DLT_IS_HTYP_UEH(msg->standardheader->htyp)){
+        f.write((char*)msg->extendedheader, sizeof(*msg->extendedheader));
+    }
+    // output data
+    if (msg->databuffersize)
+        f.write((char*)msg->databuffer, msg->databuffersize);
+    
+    return 0; // success
+}
+
 int determine_lcs(ECU_Info &ecu)
 {
     assert(ecu.lcs.size()==0);
@@ -430,9 +493,9 @@ Lifecycle::Lifecycle(const DltMessage &m)
     sec_begin = m.storageheader->seconds;
     sec_end = m.storageheader->seconds;
     if (m.headerextra.tmsp){
-        min_tmsp =(m.headerextra.tmsp / 10000L) + (m.headerextra.tmsp % 10000 >0 ? 1:0);
+        min_tmsp = m.headerextra.tmsp;
         max_tmsp = min_tmsp;
-        sec_begin -= min_tmsp; // the lifecycle started at least the cpu runtime before
+        sec_begin -= (m.headerextra.tmsp / 10000L) + (m.headerextra.tmsp % 10000 >0 ? 1:0); // the lifecycle started at least the cpu runtime before
         rel_offset_valid=true;
     }else{
         rel_offset_valid=false;
@@ -489,8 +552,8 @@ bool Lifecycle::fitsin(const DltMessage &m)
             delta=0;
         }
         
-        if (min_tmsp > msg_timestamp) min_tmsp = msg_timestamp;
-        if (max_tmsp < msg_timestamp) max_tmsp = msg_timestamp;
+        if (min_tmsp > m.headerextra.tmsp) min_tmsp = m.headerextra.tmsp;
+        if (max_tmsp < m.headerextra.tmsp) max_tmsp = m.headerextra.tmsp;
         
         msgs.push_back((DltMessage *)&m);
         return true;
@@ -502,8 +565,8 @@ bool Lifecycle::fitsin(const DltMessage &m)
                 delta=0;
             }
 
-            if (min_tmsp > msg_timestamp) min_tmsp = msg_timestamp;
-            if (max_tmsp < msg_timestamp) max_tmsp = msg_timestamp;
+            if (min_tmsp > m.headerextra.tmsp) min_tmsp = m.headerextra.tmsp;
+            if (max_tmsp < m.headerextra.tmsp) max_tmsp = m.headerextra.tmsp;
             
             msgs.push_back((DltMessage *)&m);
             return true;
@@ -511,6 +574,24 @@ bool Lifecycle::fitsin(const DltMessage &m)
 
     }
     return false;
+}
+
+int64_t Lifecycle::calc_min_time() const
+{
+    int64_t ret=0;
+    // return the min (i.e. from first msg) abs time (in 0.1ms):
+    ret=sec_begin;
+    ret *=10000L;
+    
+    ret-=min_tmsp;
+    
+    // now add the time from the first msg:
+    if (msgs.size()){
+        DltMessage *m = *msgs.begin();
+        ret+=m->headerextra.tmsp;
+    }
+    
+    return ret;
 }
 
 void Lifecycle::debug_print() const
@@ -560,6 +641,126 @@ bool OverallLC::expand_if_intersects(const Lifecycle &lc)
     return true;
 }
 
+bool OverallLC::output_to_fstream(std::ofstream &f)
+{
+    /* this is the main function to output/merge the different lifecycles
+     belonging to an overall lifecycle.
+     The lifecycles itself are sorted already but they have different 
+     initial offsets. The time-offset between ECUs is determined by:
+     lc sec_begin minus min_tmsp plus the timestamp
+     */
+    
+    assert(f.is_open());
+    
+    /* for each lifecycle/associated msg list we keep in a vector
+     iterator current and end
+     next_time in 0.1ms (timestamp resolution) */
+    VEC_OF_LC_it vec;
+    
+    /* then we always keep: index, next_index, next_time
+     and output the msgs from vector[index] till >next_time
+     then we determine new next_time and next index
+     and keep on looping until next_index is empty (vector empty)
+     */
+
+    LC_it *index=NULL; // pointing to the LC_it with the min.time
+    LC_it *next_index=NULL; // pointing to the LC_it with the min. time not from elem index
+    int64_t next_time; // next time where the change from index to next_index has to happen
+    
+    int64_t min_time=0;
+    for (LIST_OF_LCS::iterator it = lcs.begin(); it!=lcs.end(); ++it){
+        LC_it l;
+        l.it = (*it).msgs.begin();
+        l.end = (*it).msgs.end();
+        l.min_time= (*it).calc_min_time();
+        vec.push_back(l);
+        /* we can't determine index here as adding elements might invalidate the ptr to the elements!
+        if (!index){
+            min_time=l.min_time;
+            index=&vec[vec.size()-1];
+        }else{
+            if (l.min_time < min_time){
+                min_time = l.min_time;
+                index=&vec[vec.size()-1];
+            }
+        } */
+    }
+    while(vec.size()>1){ // as long as we have at least two msg lists to take care of:
+        while (next_index==NULL){
+            // need to determine the next index and next time to stop at:
+            for (VEC_OF_LC_it::iterator i=vec.begin(); i!=vec.end(); ++i){
+                if (index!=&(*i)){ // don't search at the current one
+                    if (!next_index){
+                        next_time=(*i).min_time;
+                        next_index = &(*i);
+                    }else{
+                        if ((*i).min_time < next_time){
+                            next_time = (*i).min_time;
+                            next_index = &(*i);
+                        }
+                    }
+                }
+            }
+            assert(next_index);
+            assert(next_time>=min_time); // otherwise we did a logic error
+            if (index==NULL){ // we reuse this to determine index as well
+                // this works as the comparision above is against NULL in that case
+                index=next_index;
+                min_time=next_time;
+                next_index=0;
+            }
+        }
+        assert(index);
+        assert(next_index);
+        assert(next_time>=min_time);
+        
+        // now output msgs from index until time >next time:
+        do{
+            uint32_t tmsp = (*(index->it))->headerextra.tmsp; // this needs to be done before output_message!
+            output_message(*(index->it), f); // see below!
+            ++(index->it);
+            if (index->it != index->end){
+                // update LC_it
+                index->min_time -= tmsp;
+                index->min_time += (*(index->it))->headerextra.tmsp;
+            }else{
+                // emptied this lc! we need to delete this element
+                for (VEC_OF_LC_it::iterator j=vec.begin(); (NULL!=index) && (j!=vec.end()); ++j){
+                    if (index==&(*j)){
+                        vec.erase(j);
+                        index=NULL;
+                    }
+                }
+                assert(NULL==index);
+                // sadly we need to reset next_index here as well
+                // as the vector erase might make it invalid!
+                next_index=NULL;
+            }
+            
+        }while((NULL!=index) && (index->min_time<=next_time));
+        
+        // now use the next one, except if the index one is empty.
+        // in that case rearrange the vector
+        index=next_index;
+        min_time=next_time;
+        
+        // need to set next_index to zero to be reset at next iteration:
+        next_index=NULL;
+    }
+    
+    while(vec.size()>0){ // just one item remaining:
+        assert(vec.size()==1);
+        // todo output the msgs:
+        LC_it &l=vec[0];
+        for(; l.it!=l.end; ++l.it){
+            output_message(*(l.it), f); // take care. after this call the message is corrupt! (endianess...)
+        }
+        vec.erase(vec.begin());
+    }
+    
+    return true; // success
+}
+
 int determine_overall_lcs()
 {
     assert(list_olcs.size()==0);
@@ -584,3 +785,25 @@ int determine_overall_lcs()
     return 0; // success
 }
 
+std::ofstream *get_ofstream(int cnt, std::string &templ)
+{
+    std::string name(templ);
+    if (cnt>0){
+        // we have to add _xxx to the filename
+        char nr[20];
+        snprintf(nr, 19, "%03d", cnt); // todo as we now the max number upfront we could just use an many digits as needed
+        name.append(nr);
+        // but before the ".dlt"
+        name.append(".dlt");
+    }
+    // now open the file:
+    std::ofstream *f=new std::ofstream;
+    f->open(name, ios_base::out | ios_base::binary | ios_base::trunc);
+    if (!(f->is_open())){
+        delete f;
+        f=NULL;
+        cerr << "can't open <" << name << "> for writing! Aborting!";
+        abort();
+    }
+    return f;
+}

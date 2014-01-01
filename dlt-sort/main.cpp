@@ -62,6 +62,7 @@ typedef std::map<uint32_t, ECU_Info> MAP_OF_ECUS;
 int process_input(std::ifstream &);
 int process_message(DltMessage *msg);
 int determine_lcs(ECU_Info &);
+int sort_msgs_lcs(ECU_Info &);
 void debug_print(LIST_OF_LCS &);
 
 MAP_OF_ECUS map_ecus;
@@ -156,7 +157,9 @@ int main(int argc, char * argv[])
         
         determine_lcs(info);
         // now we expect at least one lc!
-//        assert(info.lcs.size()>0);
+        assert(info.lcs.size()>0);
+        
+        sort_msgs_lcs(info);
         
         char ecu[5];
         ecu[4]=0;
@@ -362,6 +365,23 @@ int determine_lcs(ECU_Info &ecu)
         }
     }
     
+    return 0; // success
+}
+
+bool compare_tmsp(const DltMessage *first, const DltMessage *second)
+{
+    // should return true if first goes before second in strict weak ordering
+    if (first->headerextra.tmsp < second->headerextra.tmsp) return true;
+    return false;
+}
+
+int sort_msgs_lcs(ECU_Info &ecu)
+{
+    if (verbose>1) cout << "sorting...\n";
+    for (LIST_OF_LCS::iterator it = ecu.lcs.begin(); it!=ecu.lcs.end(); ++it){
+        (*it).msgs.sort(compare_tmsp);
+    }
+    if (verbose>1) cout << "...done\n";
     return 0; // success
 }
 

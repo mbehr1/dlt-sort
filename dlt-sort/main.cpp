@@ -47,25 +47,40 @@ public:
     uint32_t min_tmsp;
     uint32_t max_tmsp;
 };
-
-
 typedef std::list<Lifecycle> LIST_OF_LCS;
 
 typedef struct{
     LIST_OF_MSGS msgs;
     LIST_OF_LCS lcs;
 } ECU_Info;
-
 typedef std::map<uint32_t, ECU_Info> MAP_OF_ECUS;
+
+class OverallLC{
+public:
+    OverallLC():sec_begin(0), sec_end(0) {};
+    OverallLC(const Lifecycle&);
+    bool expand_if_intersects(const Lifecycle &);
+    void debug_print() const;
+    // member vars:
+    uint32_t sec_begin;
+    uint32_t sec_end;
+    
+    LIST_OF_LCS lcs; // associated lcs that will be merged into this one.
+};
+typedef std::list<OverallLC> LIST_OF_OLCS;
 
 /* prototype declarations */
 int process_input(std::ifstream &);
 int process_message(DltMessage *msg);
 int determine_lcs(ECU_Info &);
 int sort_msgs_lcs(ECU_Info &);
-void debug_print(LIST_OF_LCS &);
+void debug_print(const LIST_OF_LCS &);
+void debug_print(const LIST_OF_OLCS &);
+int determine_overall_lcs();
+
 
 MAP_OF_ECUS map_ecus;
+LIST_OF_OLCS list_olcs;
 
 int main(int argc, char * argv[])
 {
@@ -166,6 +181,16 @@ int main(int argc, char * argv[])
         memcpy(ecu, (char*) &it->first, sizeof(uint32_t));
         cout << "ECU <" << ecu << "> contains " << info.lcs.size() << " lifecycle\n";
         debug_print(info.lcs);
+    }
+    
+    /* now determine the set of lifecycles that belong to each other 
+     */
+    determine_overall_lcs();
+    
+    // print them:
+    if (verbose>0){
+        cout << "Overall lifecycles detected (" << list_olcs.size() << ")\n";
+        debug_print(list_olcs);
     }
     
     /* determine time-offset between ECUs:
@@ -385,10 +410,17 @@ int sort_msgs_lcs(ECU_Info &ecu)
     return 0; // success
 }
 
-void debug_print(LIST_OF_LCS &lcs)
+void debug_print(const LIST_OF_LCS &lcs)
 {
-    cout << lcs.size() << " lifecycle\n";
-    for (LIST_OF_LCS::iterator it = lcs.begin(); it!=lcs.end(); ++it){
+    // cout << lcs.size() << " lifecycle\n";
+    for (LIST_OF_LCS::const_iterator it = lcs.begin(); it!=lcs.end(); ++it){
+        (*it).debug_print();
+    }
+}
+
+void debug_print(const LIST_OF_OLCS &olcs)
+{
+    for (LIST_OF_OLCS::const_iterator it=olcs.begin(); it!= olcs.end(); ++it){
         (*it).debug_print();
     }
 }
@@ -492,3 +524,63 @@ void Lifecycle::debug_print() const
     cout << " min_tmsp=" << min_tmsp << " max_tmsp=" << max_tmsp << endl;
     cout << "  num_msgs = " << msgs.size() << endl;
 }
+
+OverallLC::OverallLC(const Lifecycle &lc)
+{
+    sec_begin=lc.sec_begin;
+    sec_end=lc.sec_end;
+    lcs.push_back(lc);
+}
+
+void OverallLC::debug_print() const
+{
+    time_t sbeg, send;
+    sbeg = sec_begin;
+    send = sec_end;
+    
+    cout << " LC from " << ctime(&sbeg) << "      to ";
+    cout << ctime(&send);
+    cout << "  num_lcs = " << lcs.size() << endl;
+}
+
+
+bool OverallLC::expand_if_intersects(const Lifecycle &lc)
+{
+    if (lc.sec_begin > sec_end) return false;
+    if (lc.sec_end < sec_begin) return false;
+    // ok, we intersect. do we need to expand?
+    if (lc.sec_begin<sec_begin) {
+        sec_begin = lc.sec_begin;
+        lcs.push_front(lc);
+    }else{
+        lcs.push_back(lc);
+    }
+    if (lc.sec_end>sec_end) sec_end = lc.sec_end;
+    
+    return true;
+}
+
+int determine_overall_lcs()
+{
+    assert(list_olcs.size()==0);
+    
+    // populate list_olcs with the merged/intersected lcs from map_ecus
+    for (MAP_OF_ECUS::iterator it=map_ecus.begin(); it!= map_ecus.end(); ++it){
+        ECU_Info &info = it->second;
+        for (LIST_OF_LCS::iterator lit=info.lcs.begin(); lit!=info.lcs.end(); ++lit){
+            bool found_intersect=false;
+            // iterate throug all olcs: this has O(n^2) complexity but we expect always very few lcs
+            for(LIST_OF_OLCS::iterator oit=list_olcs.begin(); !found_intersect && (oit!=list_olcs.end()); ++oit){
+                if ((*oit).expand_if_intersects(*lit))
+                    found_intersect=true;
+            }
+            // if not found then add new one:
+            if (!found_intersect){
+                OverallLC nlc((*lit));
+                list_olcs.push_front(nlc);
+            }
+        }
+    }
+    return 0; // success
+}
+

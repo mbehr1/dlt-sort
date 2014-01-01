@@ -8,6 +8,8 @@
 
 #include <iostream>
 #include <fstream>
+#include <list>
+#include <map>
 
 #include <getopt.h>
 #include <dlt/dlt_common.h>
@@ -25,6 +27,12 @@ void print_usage()
 }
 
 int process_input(std::ifstream &);
+int process_message(DltMessage *msg);
+
+typedef std::list<DltMessage *> LIST_OF_MSGS;
+typedef std::map<uint32_t, LIST_OF_MSGS> MAP_OF_ECUS;
+
+MAP_OF_ECUS map_ecus;
 
 int main(int argc, char * argv[])
 {
@@ -99,7 +107,16 @@ int main(int argc, char * argv[])
         }
     }
     
-
+    // now print some stats:
+    // iterate through the list of ECUs:
+    for (MAP_OF_ECUS::iterator it=map_ecus.begin(); it!= map_ecus.end(); ++it){
+        char ecu[5];
+        ecu[4]=0;
+        memcpy(ecu, (char*) &it->first, sizeof(uint32_t));
+        cout << "ECU <" << ecu << "> contains " << it->second.size() << " msgs\n";
+    }
+    
+    
     return 0; // no error (<0 for error)
 }
 
@@ -117,68 +134,70 @@ int process_input(std::ifstream &fin)
 
     int64_t remaining = file_length;
     while(remaining>=(int64_t)sizeof(DltStorageHeader)){
-        DltMessage msg;
-        msg.found_serialheader=0;
-        msg.resync_offset=0;
-        msg.storageheader = (DltStorageHeader *)&msg.headerbuffer[0];
-        msg.standardheader = (DltStandardHeader *)&msg.headerbuffer[sizeof(DltStorageHeader)];
-        msg.extendedheader = (DltExtendedHeader *)&msg.headerbuffer[sizeof(DltStorageHeader)+sizeof(DltStandardHeader)];
-        msg.headersize = -1; // not calculated yet
-        msg.datasize=-1; // not calculated yet
+        DltMessage *msg=new DltMessage;
+        msg->found_serialheader=0;
+        msg->resync_offset=0;
+        msg->storageheader = (DltStorageHeader *)&msg->headerbuffer[0];
+        msg->standardheader = (DltStandardHeader *)&msg->headerbuffer[sizeof(DltStorageHeader)];
+        msg->extendedheader = (DltExtendedHeader *)&msg->headerbuffer[sizeof(DltStorageHeader)+sizeof(DltStandardHeader)];
+        msg->headersize = -1; // not calculated yet
+        msg->datasize=-1; // not calculated yet
         
         // check for dlt storage header:
-        fin.read((char*)msg.storageheader, sizeof(*msg.storageheader));
-        remaining-= sizeof(*msg.storageheader);
-        if (0 == memcmp(msg.storageheader->pattern, DLT_ID4_ID, sizeof(msg.storageheader->pattern))){
+        fin.read((char*)msg->storageheader, sizeof(*msg->storageheader));
+        remaining-= sizeof(*msg->storageheader);
+        if (0 == memcmp(msg->storageheader->pattern, DLT_ID4_ID, sizeof(msg->storageheader->pattern))){
             // now read dlt header:
-            if (remaining >= sizeof(*msg.standardheader)){
-                fin.read((char*)msg.standardheader, sizeof(*msg.standardheader));
-                remaining -= sizeof(*msg.standardheader);
+            if (remaining >= sizeof(*msg->standardheader)){
+                fin.read((char*)msg->standardheader, sizeof(*msg->standardheader));
+                remaining -= sizeof(*msg->standardheader);
                 // verify header (somehow)
-                uint16_t len = DLT_BETOH_16(msg.standardheader->len); // fixme: why that? the macro should work! DLT_ENDIAN_GET_16(hstd.htyp, hstd.len); // len is without storage header (but with stdh)
-                if (len<=sizeof(*msg.standardheader)){
+                uint16_t len = DLT_BETOH_16(msg->standardheader->len); // fixme: why that? the macro should work! DLT_ENDIAN_GET_16(hstd.htyp, hstd.len); // len is without storage header (but with stdh)
+                if (len<=sizeof(*msg->standardheader)){
                     cerr << "msg len <= sizeof(DltStandardHeader). Stopping processing this file!\n";
                     remaining = -4;
                 }else{
-                    len -= sizeof(*msg.standardheader); // standard header already read from this message
+                    len -= sizeof(*msg->standardheader); // standard header already read from this message
                     
                     // extended header?
-                    if (DLT_IS_HTYP_WEID(msg.standardheader->htyp))
+                    if (DLT_IS_HTYP_WEID(msg->standardheader->htyp))
                     {
-                        fin.read(msg.headerextra.ecu, DLT_ID_SIZE);
-                        remaining -= DLT_ID_SIZE;
-                        len -= DLT_ID_SIZE;
+                        fin.read(msg->headerextra.ecu, DLT_SIZE_WEID); // DLT_ID_SIZE);
+                        remaining -= DLT_SIZE_WEID; // DLT_ID_SIZE;
+                        len -= DLT_SIZE_WEID; // DLT_ID_SIZE;
                     }
                     
-                    if (DLT_IS_HTYP_WSID(msg.standardheader->htyp))
+                    if (DLT_IS_HTYP_WSID(msg->standardheader->htyp))
                     {
-                        fin.read((char*)&(msg.headerextra.seid), DLT_SIZE_WSID);
-                        msg.headerextra.seid = DLT_BETOH_32(msg.headerextra.seid);
+                        fin.read((char*)&(msg->headerextra.seid), DLT_SIZE_WSID);
+                        msg->headerextra.seid = DLT_BETOH_32(msg->headerextra.seid);
                         remaining -= DLT_SIZE_WSID;
                         len -= DLT_SIZE_WSID;
                     }
                     
-                    if (DLT_IS_HTYP_WTMS(msg.standardheader->htyp))
+                    if (DLT_IS_HTYP_WTMS(msg->standardheader->htyp))
                     {
-                        fin.read((char*)&(msg.headerextra.tmsp), DLT_SIZE_WTMS);
-                        msg.headerextra.tmsp = DLT_BETOH_32(msg.headerextra.tmsp);
+                        fin.read((char*)&(msg->headerextra.tmsp), DLT_SIZE_WTMS);
+                        msg->headerextra.tmsp = DLT_BETOH_32(msg->headerextra.tmsp);
                         remaining -= DLT_SIZE_WTMS;
                         len -= DLT_SIZE_WTMS;
-                    }
+                    } else msg->headerextra.tmsp = 0;
                     
                     // has extended header?
-                    if (DLT_IS_HTYP_UEH(msg.standardheader->htyp)){
-                        fin.read((char*)msg.extendedheader, sizeof(*msg.extendedheader));
-                        remaining -= sizeof(*msg.extendedheader);
-                        len -= sizeof(*msg.extendedheader);
+                    if (DLT_IS_HTYP_UEH(msg->standardheader->htyp)){
+                        fin.read((char*)msg->extendedheader, sizeof(*msg->extendedheader));
+                        remaining -= sizeof(*msg->extendedheader);
+                        len -= sizeof(*msg->extendedheader);
                     }
                     
                     // read remaining message:
                     if (remaining >= len){
-                        msg.databuffer = new unsigned char [len];
-                        msg.databuffersize = len;
-                        fin.read((char*)msg.databuffer, len);
-                        delete msg.databuffer;
+                        msg->databuffer = new unsigned char [len];
+                        msg->databuffersize = len;
+                        fin.read((char*)msg->databuffer, len);
+                        (void)process_message(msg);
+                        // delete msg.databuffer;
+                        // delete msg // not necessary. process_message takes care
                         remaining -= len;
                         nr_msgs++;
                     }else{
@@ -192,8 +211,8 @@ int process_input(std::ifstream &fin)
             }
         }else{
             cerr << "no proper DLT pattern found! Stop processing this file!\n";
-            cerr << " found: <" << msg.storageheader->pattern[0] << msg.storageheader->pattern[1]
-              << msg.storageheader->pattern[2] << msg.storageheader->pattern[3] << ">\n";
+            cerr << " found: <" << msg->storageheader->pattern[0] << msg->storageheader->pattern[1]
+              << msg->storageheader->pattern[2] << msg->storageheader->pattern[3] << ">\n";
             remaining = -1;
         }
         
@@ -201,4 +220,51 @@ int process_input(std::ifstream &fin)
     if (verbose && remaining!=0) cout << "remaining != 0. parsing errors within that file!\n";
     if (verbose) cout << "processed " << nr_msgs << " msgs\n";
     return (int)remaining; // 0 = success, <0 error in processing
+}
+
+int process_message(DltMessage *msg)
+{
+    // we do sort by:
+    // ECU, APID, CTID
+    char ecu[DLT_ID_SIZE];
+    char apid[DLT_ID_SIZE];
+    char ctid[DLT_ID_SIZE];
+    uint32_t tmsp=msg->headerextra.tmsp;
+    int type=-1;
+    
+    if (DLT_IS_HTYP_WEID(msg->standardheader->htyp)){
+        memcpy(ecu, msg->headerextra.ecu, DLT_ID_SIZE);
+    }else{
+        memcpy(ecu, msg->storageheader->ecu, DLT_ID_SIZE);
+        if (verbose>1) cout << "  using storageheader ecu\n";
+    }
+    if ((DLT_IS_HTYP_UEH(msg->standardheader->htyp)))// && (msg.extendedheader->apid[0]!=0))
+    {
+        memcpy(apid, msg->extendedheader->apid, DLT_ID_SIZE);
+    }else{
+        memset(apid, 0, DLT_ID_SIZE);
+        if (verbose>3) cout << "  no apid\n";
+    }
+    /* extract context id */
+    if ((DLT_IS_HTYP_UEH(msg->standardheader->htyp)) )// && (msg.extendedheader->ctid[0]!=0))
+    {
+        memcpy(ctid, msg->extendedheader->ctid, DLT_ID_SIZE);
+    }else{
+        memset(ctid, 0, DLT_ID_SIZE);
+        if (verbose>3) cout << "  no ctid\n";
+    }
+
+    /* extract type */
+    if (DLT_IS_HTYP_UEH(msg->standardheader->htyp))
+    {
+        type = DLT_GET_MSIN_MSTP(msg->extendedheader->msin);
+    }
+    
+    if (verbose>1 && tmsp==0 && (type!=DLT_TYPE_CONTROL)) cout << "  no timestamp on non control msg\n";
+    
+    // here all data available to sort them:
+    LIST_OF_MSGS &list_of_msg =map_ecus[*(uint32_t*)ecu];
+    list_of_msg.push_back(msg);
+    
+    return 0; // success
 }

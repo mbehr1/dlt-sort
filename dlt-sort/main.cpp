@@ -3,7 +3,7 @@
 //  dlt-sort
 //
 //  Created by Matthias Behr on 31.12.13.
-//  Copyright (c) 2013 Matthias Behr. All rights reserved.
+//  Copyright (c) 2013, 2014 Matthias Behr. All rights reserved.
 //
 
 #include <iostream>
@@ -31,23 +31,24 @@ void print_usage()
 
 /* type definitions */
 
+typedef std::list<DltMessage *> LIST_OF_MSGS;
+
 class Lifecycle{
 public:
-    Lifecycle() : sec_begin(0), sec_end(0), rel_offset(0), num_msgs(0), rel_offset_valid(false), min_tmsp(0), max_tmsp(0) {};
+    Lifecycle() : sec_begin(0), sec_end(0), num_msgs(0), rel_offset_valid(false), min_tmsp(0), max_tmsp(0) {};
     Lifecycle(const DltMessage &);
     void debug_print() const;
     bool fitsin(const DltMessage &); // function is non const. modifies the lifecycle
     // member vars:
     uint32_t sec_begin; // secs since 1.1.1970 for begin of LC
     uint32_t sec_end; // secs since ... for end of LC
-    uint32_t rel_offset;
     uint32_t num_msgs;
     bool rel_offset_valid;
     uint32_t min_tmsp;
     uint32_t max_tmsp;
 };
 
-typedef std::list<DltMessage *> LIST_OF_MSGS;
+
 typedef std::list<Lifecycle> LIST_OF_LCS;
 
 typedef struct{
@@ -67,7 +68,7 @@ MAP_OF_ECUS map_ecus;
 
 int main(int argc, char * argv[])
 {
-    cout << "dlt-sort (c) 2013 Matthias Behr\n";
+    cout << "dlt-sort (c) 2013, 2014 Matthias Behr\n";
     
     int c, option_index;
     int do_split=0; // by default don't split output files per lifecycle
@@ -380,11 +381,9 @@ Lifecycle::Lifecycle(const DltMessage &m)
         min_tmsp =(m.headerextra.tmsp / 10000L) + (m.headerextra.tmsp % 10000 >0 ? 1:0);
         max_tmsp = min_tmsp;
         sec_begin -= min_tmsp; // the lifecycle started at least the cpu runtime before
-        rel_offset = sec_begin;
         rel_offset_valid=true;
     }else{
         rel_offset_valid=false;
-        rel_offset=0;
         min_tmsp=0;
         max_tmsp=0;
     }
@@ -433,11 +432,8 @@ bool Lifecycle::fitsin(const DltMessage &m)
         if (sec_end < m.storageheader->seconds)
             sec_end = m.storageheader->seconds;
         
-        // shall we adjust rel_offset? fixme
- 
         if (!rel_offset_valid){
             rel_offset_valid=true;
-            rel_offset=m_abs_lc_starttime;
             delta=0;
         }
         
@@ -451,7 +447,6 @@ bool Lifecycle::fitsin(const DltMessage &m)
         
             if (!rel_offset_valid){
                 rel_offset_valid=true;
-                rel_offset=m_abs_lc_starttime;
                 delta=0;
             }
 
@@ -468,14 +463,12 @@ bool Lifecycle::fitsin(const DltMessage &m)
 
 void Lifecycle::debug_print() const
 {
-    time_t sbeg, send, rel;
+    time_t sbeg, send;
     sbeg = sec_begin;
     send = sec_end;
-    rel=rel_offset;
     
     cout << " LC from " << ctime(&sbeg) << "      to ";
-    cout << ctime(&send) << "  rel.offset=";
-    cout << rel_offset << " delta=" << rel_offset-sec_begin << " " << ctime(&rel);
+    cout << ctime(&send);
     cout << " min_tmsp=" << min_tmsp << " max_tmsp=" << max_tmsp << endl;
     cout << "  num_msgs = " << num_msgs << endl;
 }

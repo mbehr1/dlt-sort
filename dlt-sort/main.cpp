@@ -10,6 +10,8 @@
 #include <fstream>
 #include <list>
 #include <map>
+#include <assert.h>
+#include <time.h>
 
 #include <getopt.h>
 #include <dlt/dlt_common.h>
@@ -17,6 +19,7 @@
 using namespace std;
 
 int verbose = 0;
+int max_delta_rel_offset = 4; // max 4s as default. todo add option
 
 void print_usage()
 {
@@ -26,11 +29,39 @@ void print_usage()
     cout << " -v --verbose  set verbose level to 1 (increase by adding more -v)\n";
 }
 
-int process_input(std::ifstream &);
-int process_message(DltMessage *msg);
+/* type definitions */
+
+class Lifecycle{
+public:
+    Lifecycle() : sec_begin(0), sec_end(0), rel_offset(0), num_msgs(0), rel_offset_valid(false), min_tmsp(0), max_tmsp(0) {};
+    Lifecycle(const DltMessage &);
+    void debug_print() const;
+    bool fitsin(const DltMessage &); // function is non const. modifies the lifecycle
+    // member vars:
+    uint32_t sec_begin; // secs since 1.1.1970 for begin of LC
+    uint32_t sec_end; // secs since ... for end of LC
+    uint32_t rel_offset;
+    uint32_t num_msgs;
+    bool rel_offset_valid;
+    uint32_t min_tmsp;
+    uint32_t max_tmsp;
+};
 
 typedef std::list<DltMessage *> LIST_OF_MSGS;
-typedef std::map<uint32_t, LIST_OF_MSGS> MAP_OF_ECUS;
+typedef std::list<Lifecycle> LIST_OF_LCS;
+
+typedef struct{
+    LIST_OF_MSGS msgs;
+    LIST_OF_LCS lcs;
+} ECU_Info;
+
+typedef std::map<uint32_t, ECU_Info> MAP_OF_ECUS;
+
+/* prototype declarations */
+int process_input(std::ifstream &);
+int process_message(DltMessage *msg);
+int determine_lcs(ECU_Info &);
+void debug_print(LIST_OF_LCS &);
 
 MAP_OF_ECUS map_ecus;
 
@@ -113,9 +144,34 @@ int main(int argc, char * argv[])
         char ecu[5];
         ecu[4]=0;
         memcpy(ecu, (char*) &it->first, sizeof(uint32_t));
-        cout << "ECU <" << ecu << "> contains " << it->second.size() << " msgs\n";
+        cout << "ECU <" << ecu << "> contains " << it->second.msgs.size() << " msgs\n";
     }
     
+    /* determine lifecycles for each ECU:
+     A new lifecycle is determined by the time distance between abs and rel timestamps.
+     */
+    for (MAP_OF_ECUS::iterator it=map_ecus.begin(); it!= map_ecus.end(); ++it){
+        ECU_Info &info = it->second;
+        
+        determine_lcs(info);
+        // now we expect at least one lc!
+//        assert(info.lcs.size()>0);
+        
+        char ecu[5];
+        ecu[4]=0;
+        memcpy(ecu, (char*) &it->first, sizeof(uint32_t));
+        cout << "ECU <" << ecu << "> contains " << info.lcs.size() << " lifecycle\n";
+        debug_print(info.lcs);
+    }
+    
+    /* determine time-offset between ECUs:
+     we have two ways:
+     a) by using the abs timestamp within the DltStorageHeader
+     b) by using the rel cpu timestamps and some sync markers (Resp/Answer) from ECU to ECU
+     */
+    
+    // free memory:
+    // tbd!
     
     return 0; // no error (<0 for error)
 }
@@ -263,8 +319,163 @@ int process_message(DltMessage *msg)
     if (verbose>1 && tmsp==0 && (type!=DLT_TYPE_CONTROL)) cout << "  no timestamp on non control msg\n";
     
     // here all data available to sort them:
-    LIST_OF_MSGS &list_of_msg =map_ecus[*(uint32_t*)ecu];
+    LIST_OF_MSGS &list_of_msg = map_ecus[*(uint32_t*)ecu].msgs;
     list_of_msg.push_back(msg);
     
     return 0; // success
+}
+
+int determine_lcs(ECU_Info &ecu)
+{
+    assert(ecu.lcs.size()==0);
+    assert(ecu.msgs.size()>0);
+    
+    // init with the first message:
+    Lifecycle lc(**ecu.msgs.begin());
+    ecu.lcs.push_back(lc);
+    
+    // now go through each message and adjust/insert new lifecycles:
+    if (ecu.msgs.size()>1){
+        LIST_OF_LCS::iterator cur_l = ecu.lcs.begin();
+        LIST_OF_MSGS::iterator it = ecu.msgs.begin();
+        ++it; // we skip the first msgs as we treated this already above
+        for (; it!=ecu.msgs.end(); ++it){
+            // to optimize performance we always check with the last matching (cur_l) one:
+            if (!((*cur_l).fitsin(**it))){
+                // check whether it fits into any other lifecyle:
+                bool found_other=false;
+                for(LIST_OF_LCS::iterator lit = ecu.lcs.begin(); !found_other && lit!=ecu.lcs.end(); ++lit){
+                    if (lit!=cur_l && (((*lit).fitsin(**it)))){
+                        found_other=true;
+                        cur_l = lit;
+                    }
+                }
+                // create a new lifecycle based on the msg and set l to this one
+                if (!found_other){
+                    Lifecycle new_lc(**it);
+                    ecu.lcs.push_back(new_lc); // todo we could use a sorted list here
+                    cur_l = ecu.lcs.end(); // (if sorted we need to find it in a different way)
+                    --cur_l; // end points to a non existing element.
+                }
+            } // else fits in cur_l -> next msg
+        }
+    }
+    
+    return 0; // success
+}
+
+void debug_print(LIST_OF_LCS &lcs)
+{
+    cout << lcs.size() << " lifecycle\n";
+    for (LIST_OF_LCS::iterator it = lcs.begin(); it!=lcs.end(); ++it){
+        (*it).debug_print();
+    }
+}
+
+Lifecycle::Lifecycle(const DltMessage &m)
+{
+    sec_begin = m.storageheader->seconds;
+    sec_end = m.storageheader->seconds;
+    if (m.headerextra.tmsp){
+        min_tmsp =(m.headerextra.tmsp / 10000L) + (m.headerextra.tmsp % 10000 >0 ? 1:0);
+        max_tmsp = min_tmsp;
+        sec_begin -= min_tmsp; // the lifecycle started at least the cpu runtime before
+        rel_offset = sec_begin;
+        rel_offset_valid=true;
+    }else{
+        rel_offset_valid=false;
+        rel_offset=0;
+        min_tmsp=0;
+        max_tmsp=0;
+    }
+    num_msgs=1;
+}
+
+bool Lifecycle::fitsin(const DltMessage &m)
+{
+    /* this is the main function for the whole sorting part
+     we check here whether a msg might belong to that lifecycle.
+     if yes, we adjust the begin/end of this lifecycle.
+     We need to check:
+      a) begin/end close to current one (??? what's close))
+      b) rel_offset similar (<= max_delta_rel_offset)
+     todo adjust description!
+     */
+    
+    // determine rel_offset
+    
+    // if tmsp is 0 we put it into this one but ignore the sec_begin/end:
+    if (m.headerextra.tmsp==0){
+        num_msgs++;
+        return true;
+    }
+    
+    uint32_t msg_timestamp = (m.headerextra.tmsp / 10000L) + (m.headerextra.tmsp % 10000 >0 ? 1:0);
+    uint32_t m_abs_lc_starttime = m.storageheader->seconds - msg_timestamp; // tmsp is in 0.1ms
+    
+    int delta=0;
+    if (rel_offset_valid) {
+        if (m_abs_lc_starttime>=sec_begin)
+            delta = m_abs_lc_starttime - sec_begin;
+        else
+            delta = sec_begin - m_abs_lc_starttime;
+    }
+    
+    if (delta <= max_delta_rel_offset){
+        
+        // adjust begin? -> we can't. we merge the lifecycles later in another step.
+        
+        if (sec_begin > m_abs_lc_starttime)
+            sec_begin = m_abs_lc_starttime; // if we do so the rel_offset should change as well!?
+        
+        
+        // adjust end?
+        if (sec_end < m.storageheader->seconds)
+            sec_end = m.storageheader->seconds;
+        
+        // shall we adjust rel_offset? fixme
+ 
+        if (!rel_offset_valid){
+            rel_offset_valid=true;
+            rel_offset=m_abs_lc_starttime;
+            delta=0;
+        }
+        
+        if (min_tmsp > msg_timestamp) min_tmsp = msg_timestamp;
+        if (max_tmsp < msg_timestamp) max_tmsp = msg_timestamp;
+        
+        num_msgs++;
+        return true;
+    }else{ // delta too high, lets check whether the start is anyhow within our start/end:
+        if (m_abs_lc_starttime <= sec_end && m_abs_lc_starttime >=sec_begin){
+        
+            if (!rel_offset_valid){
+                rel_offset_valid=true;
+                rel_offset=m_abs_lc_starttime;
+                delta=0;
+            }
+
+            if (min_tmsp > msg_timestamp) min_tmsp = msg_timestamp;
+            if (max_tmsp < msg_timestamp) max_tmsp = msg_timestamp;
+            
+            num_msgs++;
+            return true;
+        }
+
+    }
+    return false;
+}
+
+void Lifecycle::debug_print() const
+{
+    time_t sbeg, send, rel;
+    sbeg = sec_begin;
+    send = sec_end;
+    rel=rel_offset;
+    
+    cout << " LC from " << ctime(&sbeg) << "      to ";
+    cout << ctime(&send) << "  rel.offset=";
+    cout << rel_offset << " delta=" << rel_offset-sec_begin << " " << ctime(&rel);
+    cout << " min_tmsp=" << min_tmsp << " max_tmsp=" << max_tmsp << endl;
+    cout << "  num_msgs = " << num_msgs << endl;
 }

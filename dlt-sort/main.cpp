@@ -35,14 +35,14 @@ typedef std::list<DltMessage *> LIST_OF_MSGS;
 
 class Lifecycle{
 public:
-    Lifecycle() : sec_begin(0), sec_end(0), num_msgs(0), rel_offset_valid(false), min_tmsp(0), max_tmsp(0) {};
+    Lifecycle() : sec_begin(0), sec_end(0), rel_offset_valid(false), min_tmsp(0), max_tmsp(0) {};
     Lifecycle(const DltMessage &);
     void debug_print() const;
     bool fitsin(const DltMessage &); // function is non const. modifies the lifecycle
     // member vars:
     uint32_t sec_begin; // secs since 1.1.1970 for begin of LC
     uint32_t sec_end; // secs since ... for end of LC
-    uint32_t num_msgs;
+    LIST_OF_MSGS msgs; // list of messages. we just keep a copy of the ptr to the DltMessage!
     bool rel_offset_valid;
     uint32_t min_tmsp;
     uint32_t max_tmsp;
@@ -387,7 +387,7 @@ Lifecycle::Lifecycle(const DltMessage &m)
         min_tmsp=0;
         max_tmsp=0;
     }
-    num_msgs=1;
+    msgs.push_front((DltMessage *)&m); // we might consider removing the const in the param. but by adding it to the list and even within we will never modify the object.
 }
 
 bool Lifecycle::fitsin(const DltMessage &m)
@@ -405,7 +405,7 @@ bool Lifecycle::fitsin(const DltMessage &m)
     
     // if tmsp is 0 we put it into this one but ignore the sec_begin/end:
     if (m.headerextra.tmsp==0){
-        num_msgs++;
+        msgs.push_back((DltMessage *)&m);
         return true;
     }
     
@@ -440,7 +440,7 @@ bool Lifecycle::fitsin(const DltMessage &m)
         if (min_tmsp > msg_timestamp) min_tmsp = msg_timestamp;
         if (max_tmsp < msg_timestamp) max_tmsp = msg_timestamp;
         
-        num_msgs++;
+        msgs.push_back((DltMessage *)&m);
         return true;
     }else{ // delta too high, lets check whether the start is anyhow within our start/end:
         if (m_abs_lc_starttime <= sec_end && m_abs_lc_starttime >=sec_begin){
@@ -453,7 +453,7 @@ bool Lifecycle::fitsin(const DltMessage &m)
             if (min_tmsp > msg_timestamp) min_tmsp = msg_timestamp;
             if (max_tmsp < msg_timestamp) max_tmsp = msg_timestamp;
             
-            num_msgs++;
+            msgs.push_back((DltMessage *)&m);
             return true;
         }
 
@@ -470,5 +470,5 @@ void Lifecycle::debug_print() const
     cout << " LC from " << ctime(&sbeg) << "      to ";
     cout << ctime(&send);
     cout << " min_tmsp=" << min_tmsp << " max_tmsp=" << max_tmsp << endl;
-    cout << "  num_msgs = " << num_msgs << endl;
+    cout << "  num_msgs = " << msgs.size() << endl;
 }

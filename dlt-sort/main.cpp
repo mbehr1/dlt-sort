@@ -20,16 +20,19 @@
 
 using namespace std;
 
-const char* const dlt_sort_version="0.2";
+const char* const dlt_sort_version="0.3";
+
+const long usecs_per_sec = 1000000L;
 
 int verbose = 0;
-int max_delta_sec_end_extended = 4; // max 4s. the end get's extended by this message. otherwise we start a new lc. todo add option
-int max_delta_sec_begin_earlier = 15; // max 15s. the sec_begin get's adjusted. this msg moves the lc start max 15s earlier. todo add option
+long max_delta_usec_end_extended = 4 * usecs_per_sec; // max 4s. the end get's extended by this message. otherwise we start a new lc. todo add option
+long max_delta_usec_begin_earlier = 15 * usecs_per_sec; // max 15s. the sec_begin get's adjusted. this msg moves the lc start max 15s earlier. todo add option
 
 void print_usage()
 {
     cout << "usage dlt-sort [options] input-file input-file ...\n";
     cout << " -s --split    split output file automatically one for each lifecycle\n";
+    cout << " -f --file outputfilename (default dlt_sorted.dlt). If split is active xxx.dlt will be added automatically.\n";
     cout << " -h --help     show usage/help\n";
     cout << " -v --verbose  set verbose level to 1 (increase by adding more -v)\n";
 }
@@ -40,14 +43,14 @@ typedef std::list<DltMessage *> LIST_OF_MSGS;
 
 class Lifecycle{
 public:
-    Lifecycle() : sec_begin(0), sec_end(0), rel_offset_valid(false), min_tmsp(0), max_tmsp(0) {};
+    Lifecycle() : usec_begin(0), usec_end(0), rel_offset_valid(false), min_tmsp(0), max_tmsp(0) {};
     Lifecycle(const DltMessage &);
     void debug_print() const;
     bool fitsin(const DltMessage &); // function is non const. modifies the lifecycle
     int64_t calc_min_time() const;
     // member vars:
-    uint32_t sec_begin; // secs since 1.1.1970 for begin of LC
-    uint32_t sec_end; // secs since ... for end of LC
+    int64_t usec_begin; // secs since 1.1.1970 for begin of LC
+    int64_t usec_end; // secs since ... for end of LC
     LIST_OF_MSGS msgs; // list of messages. we just keep a copy of the ptr to the DltMessage!
     bool rel_offset_valid;
     uint32_t min_tmsp;
@@ -64,14 +67,14 @@ typedef std::map<uint32_t, ECU_Info> MAP_OF_ECUS;
 
 class OverallLC{
 public:
-    OverallLC():sec_begin(0), sec_end(0) {};
+    OverallLC():usec_begin(0), usec_end(0) {};
     OverallLC(const Lifecycle&);
     bool expand_if_intersects(const Lifecycle &);
     bool output_to_fstream(std::ofstream &f);
     void debug_print() const;
     // member vars:
-    uint32_t sec_begin;
-    uint32_t sec_end;
+    int64_t usec_begin;
+    int64_t usec_end;
     
     LIST_OF_LCS lcs; // associated lcs that will be merged into this one.
 };
@@ -494,12 +497,14 @@ void debug_print(const LIST_OF_OLCS &olcs)
 
 Lifecycle::Lifecycle(const DltMessage &m)
 {
-    sec_begin = m.storageheader->seconds;
-    sec_end = m.storageheader->seconds;
+    usec_begin = m.storageheader->seconds;
+    usec_begin *= usecs_per_sec;
+    usec_begin += m.storageheader->microseconds;
+    usec_end = usec_begin;
     if (m.headerextra.tmsp){
         min_tmsp = m.headerextra.tmsp;
         max_tmsp = min_tmsp;
-        sec_begin -= (m.headerextra.tmsp / 10000L) + (m.headerextra.tmsp % 10000 >0 ? 1:0); // the lifecycle started at least the cpu runtime before
+        usec_begin -= (((int64_t)m.headerextra.tmsp) * 100LL); // tmsp is in 0.1ms granularity. The lifecycle started at least the cpu runtime before
         rel_offset_valid=true;
     }else{
         rel_offset_valid=false;
@@ -553,9 +558,10 @@ bool Lifecycle::fitsin(const DltMessage &m)
     }
     
     // msg tmsp in seconds (rounded) (x from above)
-    uint32_t msg_timestamp = (m.headerextra.tmsp / 10000L) + (m.headerextra.tmsp % 10000 >0 ? 1:0);
+    int64_t msg_timestamp = (((int64_t)m.headerextra.tmsp) *100LL);
     // this would be the starttime if the processing time/jitter j would be 0. (sh_tx-x)
-    uint32_t m_abs_lc_starttime = m.storageheader->seconds - msg_timestamp;
+    int64_t m_abs_lc_starttime = (((int64_t)m.storageheader->seconds) * usecs_per_sec)
+        + (m.storageheader->microseconds) - msg_timestamp;
 
     // sec_begin keeps the min abs starttime t0
     // so if this message belongs to this lifecycle there would be
@@ -567,14 +573,14 @@ bool Lifecycle::fitsin(const DltMessage &m)
     // a) the end get's extended by this message: max_delta_sec_end_extended
     // b) the sec_begin get's adjusted: max_delta_sec_begin_earlier
     
-    uint32_t new_sec_begin = min(sec_begin, m_abs_lc_starttime);
-    uint32_t m_tx = new_sec_begin + msg_timestamp;
+    int64_t new_usec_begin = min(usec_begin, m_abs_lc_starttime);
+    int64_t m_tx = new_usec_begin + msg_timestamp;
     
-    if (((new_sec_begin + max_delta_sec_begin_earlier) >= sec_begin) &&
-        (m_tx <= (sec_end+max_delta_sec_end_extended))){
+    if (((new_usec_begin + max_delta_usec_begin_earlier) >= usec_begin) &&
+        (m_tx <= (usec_end+max_delta_usec_end_extended))){
         // ok belongs to this one.
-        if (new_sec_begin<sec_begin) sec_begin = new_sec_begin;
-        if (m_tx > sec_end) sec_end = m_tx;
+        if (new_usec_begin<usec_begin) usec_begin = new_usec_begin;
+        if (m_tx > usec_end) usec_end = m_tx;
         msgs.push_back((DltMessage *)&m);
         
         if (min_tmsp > m.headerextra.tmsp) min_tmsp = m.headerextra.tmsp;
@@ -591,15 +597,14 @@ int64_t Lifecycle::calc_min_time() const
 {
     int64_t ret=0;
     // return the min (i.e. from first msg) abs time (in 0.1ms):
-    ret=sec_begin;
-    ret *=10000L;
+    ret=usec_begin;
     
-    ret-=min_tmsp;
+    // this is already anticipated in usec_begin ret-=(((int64_t)min_tmsp) * 100L); // tmsp in 0.1ms gran.
     
     // now add the time from the first msg:
     if (msgs.size()){
         DltMessage *m = *msgs.begin();
-        ret+=m->headerextra.tmsp;
+        ret+=(((int64_t)m->headerextra.tmsp) * 100LL);
     }
     
     return ret;
@@ -608,8 +613,8 @@ int64_t Lifecycle::calc_min_time() const
 void Lifecycle::debug_print() const
 {
     time_t sbeg, send;
-    sbeg = sec_begin;
-    send = sec_end;
+    sbeg = usec_begin / usecs_per_sec;
+    send = usec_end / usecs_per_sec;
     
     cout << " LC from " << ctime(&sbeg) << "      to ";
     cout << ctime(&send);
@@ -619,16 +624,16 @@ void Lifecycle::debug_print() const
 
 OverallLC::OverallLC(const Lifecycle &lc)
 {
-    sec_begin=lc.sec_begin;
-    sec_end=lc.sec_end;
+    usec_begin=lc.usec_begin;
+    usec_end=lc.usec_end;
     lcs.push_back(lc);
 }
 
 void OverallLC::debug_print() const
 {
     time_t sbeg, send;
-    sbeg = sec_begin;
-    send = sec_end;
+    sbeg = usec_begin / usecs_per_sec;
+    send = usec_end / usecs_per_sec;
     
     cout << " LC from " << ctime(&sbeg) << "      to ";
     cout << ctime(&send);
@@ -638,16 +643,16 @@ void OverallLC::debug_print() const
 
 bool OverallLC::expand_if_intersects(const Lifecycle &lc)
 {
-    if (lc.sec_begin > sec_end) return false;
-    if (lc.sec_end < sec_begin) return false;
+    if (lc.usec_begin > usec_end) return false;
+    if (lc.usec_end < usec_begin) return false;
     // ok, we intersect. do we need to expand?
-    if (lc.sec_begin<sec_begin) {
-        sec_begin = lc.sec_begin;
+    if (lc.usec_begin<usec_begin) {
+        usec_begin = lc.usec_begin;
         lcs.push_front(lc);
     }else{
         lcs.push_back(lc);
     }
-    if (lc.sec_end>sec_end) sec_end = lc.sec_end;
+    if (lc.usec_end>usec_end) usec_end = lc.usec_end;
     
     return true;
 }
@@ -665,7 +670,7 @@ bool OverallLC::output_to_fstream(std::ofstream &f)
     
     /* for each lifecycle/associated msg list we keep in a vector
      iterator current and end
-     next_time in 0.1ms (timestamp resolution) */
+     next_time in us resolution */
     VEC_OF_LC_it vec;
     
     /* then we always keep: index, next_index, next_time
@@ -685,16 +690,6 @@ bool OverallLC::output_to_fstream(std::ofstream &f)
         l.end = (*it).msgs.end();
         l.min_time= (*it).calc_min_time();
         vec.push_back(l);
-        /* we can't determine index here as adding elements might invalidate the ptr to the elements!
-        if (!index){
-            min_time=l.min_time;
-            index=&vec[vec.size()-1];
-        }else{
-            if (l.min_time < min_time){
-                min_time = l.min_time;
-                index=&vec[vec.size()-1];
-            }
-        } */
     }
     while(vec.size()>1){ // as long as we have at least two msg lists to take care of:
         while (next_index==NULL){
@@ -727,13 +722,13 @@ bool OverallLC::output_to_fstream(std::ofstream &f)
         
         // now output msgs from index until time >next time:
         do{
-            uint32_t tmsp = (*(index->it))->headerextra.tmsp; // this needs to be done before output_message!
+            int64_t tmsp = 100LL*((int64_t)((*(index->it))->headerextra.tmsp)); // this needs to be done before output_message!
             output_message(*(index->it), f); // see below!
             ++(index->it);
             if (index->it != index->end){
                 // update LC_it
                 index->min_time -= tmsp;
-                index->min_time += (*(index->it))->headerextra.tmsp;
+                index->min_time += 100LL*((int64_t)((*(index->it))->headerextra.tmsp));
             }else{
                 // emptied this lc! we need to delete this element
                 for (VEC_OF_LC_it::iterator j=vec.begin(); (NULL!=index) && (j!=vec.end()); ++j){

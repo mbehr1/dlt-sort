@@ -1,0 +1,51 @@
+dlt_sort: sorting tool for dlt log and trace files (like cat, sort).
+
+Main purpose:
+
+- Sort dlt messages inside dlt files by timestamp instead of the time of
+  arrival at the logger. The dlt log messages itself stay untouched. They
+  will just be moved within the log file.
+- Merge multiple log files into a single file. This eases handling with e.g. 
+  the dlt-viewer tool.
+- Merge log files from different ECUs into a single file. The main benefit here
+  is that the timestamps will be adjusted so that they get sorted by the real
+  time and not by the time of arrival at the logger. See details below.
+- Detect different lifecycles within the log files and split the log files 
+  automatically by lifecycles.
+
+
+To build:
+
+under OSX:
+
+use the provided XCode project.
+
+under Linux/Windows:
+
+g++ main.cpp -I <path_to_dlt_include_dir>
+
+
+Usage:
+
+see dlt_sort --help
+
+Examples:
+
+1. simply sort a single file: 
+    dlt_sort input.dlt
+will generate a file named dlt_sorted.dlt containing the logs sorted by
+dlt timestamp.
+
+2. Merge two log files into a single file:
+    dlt_sort input1.dlt input2.dlt
+will generate a file named out.dlt containing the logs from both input files 
+sorted by dlt timestamp (and adjusted if they are from multiple ecus.)
+
+3. Split by lifecycle:
+    dlt_sort -f dlt_sorted_ -s input1.dlt
+will generate files named dlt_sorted_001.dlt (and ..._xxx.dlt).
+
+More to follow.
+
+
+EOF

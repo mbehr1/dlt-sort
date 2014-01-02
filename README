@@ -22,7 +22,7 @@ use the provided XCode project.
 
 under Linux/Windows:
 
-g++ main.cpp -I <path_to_dlt_include_dir>
+g++ main.cpp -o dlt_sort[.exe] -I <path_to_dlt_include_dir>
 
 
 Usage:

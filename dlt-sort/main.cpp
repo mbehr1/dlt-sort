@@ -22,6 +22,8 @@ using namespace std;
 
 int verbose = 0;
 int max_delta_rel_offset = 4; // max 4s as default. todo add option
+int max_delta_sec_end_extended = 4; // max 4s. the end get's extended by this message. otherwise we start a new lc. todo add option
+int max_delta_sec_begin_earlier = 15; // max 15s. the sec_begin get's adjusted. this msg moves the lc start max 15s earlier. todo add option
 
 void print_usage()
 {
@@ -49,6 +51,8 @@ public:
     bool rel_offset_valid;
     uint32_t min_tmsp;
     uint32_t max_tmsp;
+private:
+    bool fitsin_v1(const DltMessage &); // first version working somewhat ok (but strangely because the algorithm is wrong/strange)
 };
 typedef std::list<Lifecycle> LIST_OF_LCS;
 
@@ -506,6 +510,84 @@ Lifecycle::Lifecycle(const DltMessage &m)
 }
 
 bool Lifecycle::fitsin(const DltMessage &m)
+{
+    /* this is the main function for the whole sorting part
+     we check here whether a msg might belong to that lifecycle.
+     if yes, we adjust the begin/end of this lifecycle.
+     
+     The algorithm checks:
+     Assuming that this message belongs to this lifecycle:
+     a) what would be the absolut starttime of this lifecycle?
+     b) what would be the absolut time of this message
+
+     Basically the model behind is:
+     An ECU gets started at abs starttime t0 (this would be rel. tmsp 0).
+     Each message get's logged at rel time with tmsp x (at abs time tx=t0+x).
+     The message takes time j to be processed (due to scheduling/cpu priorites/queues/
+     time to connect the logger/... to arrive at the logger and then gets 
+     the abs timestamp in the storageheader sh_tx: sh_tx = tx+j = t0+x+j
+     There will be a minimal processing time j_min>=0.
+     
+     The abs starttime of the lifecycle is assumed to be at j_min.
+
+     simplified: t0 = min{from all messages}(sh_tx - x)
+    
+     The abs time tx of this message is then: t0 + x. This varies over time as 
+     the minimum will shrink over time. So ideally a two path approach would be 
+     needed.
+     
+     
+     For now we ignore/throw away msgs with rel. tmsp 0 as they are effectively send
+     at a different time and are thus unreliable.
+     todo: simply add those messages if they fit by the sh_tx time within that lifecycle.
+     
+     todo: add support for abs tmsp (vs. rel. as required by dlt spec) as this seems to be 
+      used by some ECU dlt implementations...
+     
+     */
+    
+    // if tmsp is 0 we claim it fits but actually throw it away (see above)
+    if (m.headerextra.tmsp==0){
+        // msgs.push_back((DltMessage *)&m);
+        return true;
+    }
+    
+    // msg tmsp in seconds (rounded) (x from above)
+    uint32_t msg_timestamp = (m.headerextra.tmsp / 10000L) + (m.headerextra.tmsp % 10000 >0 ? 1:0);
+    // this would be the starttime if the processing time/jitter j would be 0. (sh_tx-x)
+    uint32_t m_abs_lc_starttime = m.storageheader->seconds - msg_timestamp;
+
+    // sec_begin keeps the min abs starttime t0
+    // so if this message belongs to this lifecycle there would be
+    // new_sec_begin = min(sec_begin, m_abs_lc_starttime)
+    // the message would have been send at: m_tx = sec_begin + msg_timestamp.
+    // if this fits clearly within the end range then we assume the message belongs to this one
+    // and update sec_begin accordingly
+    // we need to ranges to judge:
+    // a) the end get's extended by this message: max_delta_sec_end_extended
+    // b) the sec_begin get's adjusted: max_delta_sec_begin_earlier
+    
+    uint32_t new_sec_begin = min(sec_begin, m_abs_lc_starttime);
+    uint32_t m_tx = new_sec_begin + msg_timestamp;
+    
+    if (((new_sec_begin + max_delta_sec_begin_earlier) >= sec_begin) &&
+        (m_tx <= (sec_end+max_delta_sec_end_extended))){
+        // ok belongs to this one.
+        if (new_sec_begin<sec_begin) sec_begin = new_sec_begin;
+        if (m_tx > sec_end) sec_end = m_tx;
+        msgs.push_back((DltMessage *)&m);
+        
+        if (min_tmsp > m.headerextra.tmsp) min_tmsp = m.headerextra.tmsp;
+        if (max_tmsp < m.headerextra.tmsp) max_tmsp = m.headerextra.tmsp;
+        
+        return true;
+    }
+    
+    return false;
+}
+
+
+bool Lifecycle::fitsin_v1(const DltMessage &m)
 {
     /* this is the main function for the whole sorting part
      we check here whether a msg might belong to that lifecycle.

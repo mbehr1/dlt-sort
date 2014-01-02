@@ -12,6 +12,8 @@
 #include <map>
 #include <vector>
 
+#include <stdlib.h> // for abort
+#include <string.h> // for memcpy
 #include <assert.h>
 #include <time.h>
 
@@ -804,7 +806,7 @@ std::ofstream *get_ofstream(int cnt, std::string &templ)
     }
     // now open the file:
     std::ofstream *f=new std::ofstream;
-    f->open(name, ios_base::out | ios_base::binary | ios_base::trunc);
+    f->open(name.c_str(), ios_base::out | ios_base::binary | ios_base::trunc);
     if (!(f->is_open())){
         delete f;
         f=NULL;

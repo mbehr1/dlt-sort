@@ -20,8 +20,9 @@
 
 using namespace std;
 
+const char* const dlt_sort_version="0.2";
+
 int verbose = 0;
-int max_delta_rel_offset = 4; // max 4s as default. todo add option
 int max_delta_sec_end_extended = 4; // max 4s. the end get's extended by this message. otherwise we start a new lc. todo add option
 int max_delta_sec_begin_earlier = 15; // max 15s. the sec_begin get's adjusted. this msg moves the lc start max 15s earlier. todo add option
 
@@ -51,8 +52,7 @@ public:
     bool rel_offset_valid;
     uint32_t min_tmsp;
     uint32_t max_tmsp;
-private:
-    bool fitsin_v1(const DltMessage &); // first version working somewhat ok (but strangely because the algorithm is wrong/strange)
+
 };
 typedef std::list<Lifecycle> LIST_OF_LCS;
 
@@ -101,7 +101,7 @@ LIST_OF_OLCS list_olcs;
 
 int main(int argc, char * argv[])
 {
-    cout << "dlt-sort (c) 2013, 2014 Matthias Behr\n";
+    cout << "dlt-sort (v" << dlt_sort_version << ") (c) 2013, 2014 Matthias Behr\n";
     
     int c, option_index;
     int do_split=0; // by default don't split output files per lifecycle
@@ -586,77 +586,6 @@ bool Lifecycle::fitsin(const DltMessage &m)
     return false;
 }
 
-
-bool Lifecycle::fitsin_v1(const DltMessage &m)
-{
-    /* this is the main function for the whole sorting part
-     we check here whether a msg might belong to that lifecycle.
-     if yes, we adjust the begin/end of this lifecycle.
-     We need to check:
-      a) begin/end close to current one (??? what's close))
-      b) rel_offset similar (<= max_delta_rel_offset)
-     todo adjust description!
-     */
-    
-    // determine rel_offset
-    
-    // if tmsp is 0 we put it into this one but ignore the sec_begin/end:
-    if (m.headerextra.tmsp==0){
-        msgs.push_back((DltMessage *)&m);
-        return true;
-    }
-    
-    uint32_t msg_timestamp = (m.headerextra.tmsp / 10000L) + (m.headerextra.tmsp % 10000 >0 ? 1:0);
-    uint32_t m_abs_lc_starttime = m.storageheader->seconds - msg_timestamp; // tmsp is in 0.1ms
-    
-    int delta=0;
-    if (rel_offset_valid) {
-        if (m_abs_lc_starttime>=sec_begin)
-            delta = m_abs_lc_starttime - sec_begin;
-        else
-            delta = sec_begin - m_abs_lc_starttime;
-    }
-    
-    if (delta <= max_delta_rel_offset){
-        
-        // adjust begin? -> we can't. we merge the lifecycles later in another step.
-        
-        if (sec_begin > m_abs_lc_starttime)
-            sec_begin = m_abs_lc_starttime; // if we do so the rel_offset should change as well!?
-        
-        
-        // adjust end?
-        if (sec_end < m.storageheader->seconds)
-            sec_end = m.storageheader->seconds;
-        
-        if (!rel_offset_valid){
-            rel_offset_valid=true;
-            delta=0;
-        }
-        
-        if (min_tmsp > m.headerextra.tmsp) min_tmsp = m.headerextra.tmsp;
-        if (max_tmsp < m.headerextra.tmsp) max_tmsp = m.headerextra.tmsp;
-        
-        msgs.push_back((DltMessage *)&m);
-        return true;
-    }else{ // delta too high, lets check whether the start is anyhow within our start/end:
-        if (m_abs_lc_starttime <= sec_end && m_abs_lc_starttime >=sec_begin){
-        
-            if (!rel_offset_valid){
-                rel_offset_valid=true;
-                delta=0;
-            }
-
-            if (min_tmsp > m.headerextra.tmsp) min_tmsp = m.headerextra.tmsp;
-            if (max_tmsp < m.headerextra.tmsp) max_tmsp = m.headerextra.tmsp;
-            
-            msgs.push_back((DltMessage *)&m);
-            return true;
-        }
-
-    }
-    return false;
-}
 
 int64_t Lifecycle::calc_min_time() const
 {

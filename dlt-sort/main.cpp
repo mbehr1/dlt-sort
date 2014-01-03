@@ -22,13 +22,11 @@
 
 using namespace std;
 
-const char* const dlt_sort_version="0.3";
+const char* const dlt_sort_version="0.4";
 
 const long usecs_per_sec = 1000000L;
 
 int verbose = 0;
-long max_delta_usec_end_extended = 0 * usecs_per_sec; // max 4s. the end get's extended by this message. otherwise we start a new lc. todo add option
-long max_delta_usec_begin_earlier = 1 * usecs_per_sec; // max 5s. the sec_begin get's adjusted. this msg moves the lc start max 15s earlier. todo add option
 
 void print_usage()
 {
@@ -572,7 +570,7 @@ bool Lifecycle::fitsin(const DltMessage &m)
     // if the message fits clearly we and update sec_begin and sec_end accordingly
     
     int64_t new_usec_begin = min(usec_begin, m_abs_lc_starttime);
-    int64_t m_new_tx = new_usec_begin + msg_timestamp;
+    // we don't need this any longer int64_t m_new_tx = new_usec_begin + msg_timestamp;
     int64_t m_org_tx = m_abs_lc_starttime + msg_timestamp;
     
     // the m_abs_lc_starttime can only be ge (>=) the real abs_lc_starttime as
@@ -599,17 +597,6 @@ bool Lifecycle::fitsin(const DltMessage &m)
     {
         toret = true;
     }
-
-    // if the new start would be slightly before the current one and
-    // the start incl. jitter is before the end
-    // and the new m_tx time would extend just slightly this lc:
-    // this check is not 100% safe but using the delta windows as heuristics.
-    if (false && ((new_usec_begin + max_delta_usec_begin_earlier) >= usec_begin) &&
-        (m_abs_lc_starttime <= usec_end) &&
-        (m_new_tx <= (usec_end+max_delta_usec_end_extended)))
-    {
-        toret = true;
-    }
     
     if (toret){
         // ok belongs to this one.
@@ -624,7 +611,12 @@ bool Lifecycle::fitsin(const DltMessage &m)
         msgs.push_back((DltMessage *)&m);
         
         // update min/max tmsp:
-        if (min_tmsp > m.headerextra.tmsp) min_tmsp = m.headerextra.tmsp;
+        if (!rel_offset_valid){
+            min_tmsp = m.headerextra.tmsp;
+            rel_offset_valid = true;
+        }else{
+            if (min_tmsp > m.headerextra.tmsp) min_tmsp = m.headerextra.tmsp;
+        }
         if (max_tmsp < m.headerextra.tmsp) max_tmsp = m.headerextra.tmsp;
     }
     

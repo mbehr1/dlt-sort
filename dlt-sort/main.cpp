@@ -22,7 +22,7 @@
 
 using namespace std;
 
-const char* const dlt_sort_version="0.5";
+const char* const dlt_sort_version="0.6";
 
 const long usecs_per_sec = 1000000L;
 
@@ -478,6 +478,12 @@ bool compare_tmsp(const DltMessage *first, const DltMessage *second)
     return false;
 }
 
+bool compare_usecbegin(const OverallLC &first, const OverallLC &second)
+{
+    if (first.usec_begin < second.usec_begin) return true;
+    return false;
+}
+
 int sort_msgs_lcs(ECU_Info &ecu)
 {
     if (verbose>1) cout << "sorting...\n";
@@ -869,6 +875,9 @@ int determine_overall_lcs()
             }
         }
     }
+    // now quickly sort them by start time:
+    list_olcs.sort(compare_usecbegin);
+    
     return 0; // success
 }
 

@@ -22,7 +22,7 @@
 
 using namespace std;
 
-const char* const dlt_sort_version="0.4";
+const char* const dlt_sort_version="0.5";
 
 const long usecs_per_sec = 1000000L;
 
@@ -48,6 +48,7 @@ public:
     void debug_print() const;
     bool fitsin(const DltMessage &); // function is non const. modifies the lifecycle
     int64_t calc_min_time() const;
+    bool expand_if_intersects(Lifecycle &l);
     // member vars:
     int64_t usec_begin; // secs since 1.1.1970 for begin of LC
     int64_t usec_end; // secs since ... for end of LC
@@ -93,6 +94,8 @@ int process_message(DltMessage *msg);
 int output_message(DltMessage *msg, std::ofstream &f);
 int determine_lcs(ECU_Info &);
 int sort_msgs_lcs(ECU_Info &);
+int merge_lcs(ECU_Info &);
+
 void debug_print(const LIST_OF_LCS &);
 void debug_print(const LIST_OF_OLCS &);
 int determine_overall_lcs();
@@ -196,12 +199,17 @@ int main(int argc, char * argv[])
         // now we expect at least one lc!
         assert(info.lcs.size()>0);
         
-        sort_msgs_lcs(info);
-        
         char ecu[5];
         ecu[4]=0;
         memcpy(ecu, (char*) &it->first, sizeof(uint32_t));
         cout << "ECU <" << ecu << "> contains " << info.lcs.size() << " lifecycle\n";
+        debug_print(info.lcs);
+        
+        // now see whether they overall (the detection does not always work 100%
+        // esp. on short lifecycles:
+        merge_lcs(info);
+        sort_msgs_lcs(info);
+        cout << "ECU <" << ecu << "> contains " << info.lcs.size() << " lifecycle after merge:\n";
         debug_print(info.lcs);
     }
     
@@ -480,6 +488,30 @@ int sort_msgs_lcs(ECU_Info &ecu)
     return 0; // success
 }
 
+int merge_lcs(ECU_Info &ecu)
+{
+    if (verbose>1) cout << "merging...\n";
+    bool merged;
+    do{
+        merged=false;
+        for (LIST_OF_LCS::iterator it = ecu.lcs.begin(); !merged && (it!=ecu.lcs.end()); ++it){
+            LIST_OF_LCS::iterator j = it;
+            j++;
+            for(; !merged && (j!= ecu.lcs.end()); ++j){
+                // check whether j overlaps with it:
+                if ((*it).expand_if_intersects(*j)){
+                    // now we need to delete j
+                    assert((*j).msgs.size()==0);
+                    ecu.lcs.erase(j);
+                    merged=true;
+                }
+            }
+        }
+    }while(merged);
+    if (verbose>1) cout << "...done\n";
+    return 0; // success
+}
+
 void debug_print(const LIST_OF_LCS &lcs)
 {
     // cout << lcs.size() << " lifecycle\n";
@@ -640,6 +672,24 @@ int64_t Lifecycle::calc_min_time() const
     
     return ret;
 }
+
+bool Lifecycle::expand_if_intersects(Lifecycle &lc)
+{
+    if (lc.usec_begin > usec_end) return false;
+    if (lc.usec_end < usec_begin) return false;
+    // ok, we intersect. do we need to expand?
+    if (lc.usec_begin<usec_begin) usec_begin = lc.usec_begin;
+    if (lc.usec_end>usec_end) usec_end = lc.usec_end;
+    
+    if (lc.rel_offset_valid && (lc.min_tmsp < min_tmsp)) min_tmsp = lc.min_tmsp;
+    if (lc.max_tmsp > max_tmsp) max_tmsp = lc.max_tmsp;
+    
+    // now move all the messages from lc to us:
+    msgs.splice(msgs.begin(), lc.msgs); // take care we loose sorting here (if it was sorted before!)
+    
+    return true;
+}
+
 
 void Lifecycle::debug_print() const
 {

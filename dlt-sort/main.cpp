@@ -391,7 +391,9 @@ int process_message(DltMessage *msg)
     if (verbose>1 && tmsp==0 && (type!=DLT_TYPE_CONTROL)) cout << "  no timestamp on non control msg\n";
     
     // here all data available to sort them:
-    LIST_OF_MSGS &list_of_msg = map_ecus[*(uint32_t*)ecu].msgs;
+	uint32_t ecu_i;
+	memcpy (&ecu_i, ecu, sizeof(ecu_i));
+    LIST_OF_MSGS &list_of_msg = map_ecus[ecu_i].msgs;
     list_of_msg.push_back(msg);
     
     return 0; // success
@@ -768,7 +770,7 @@ bool OverallLC::output_to_fstream(std::ofstream &f)
 
     LC_it *index=NULL; // pointing to the LC_it with the min.time
     LC_it *next_index=NULL; // pointing to the LC_it with the min. time not from elem index
-    int64_t next_time; // next time where the change from index to next_index has to happen
+    int64_t next_time=0; // next time where the change from index to next_index has to happen
     
     int64_t min_time=0;
     for (LIST_OF_LCS::iterator it = lcs.begin(); it!=lcs.end(); ++it){

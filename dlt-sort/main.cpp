@@ -27,8 +27,8 @@ const char* const dlt_sort_version="0.3";
 const long usecs_per_sec = 1000000L;
 
 int verbose = 0;
-long max_delta_usec_end_extended = 4 * usecs_per_sec; // max 4s. the end get's extended by this message. otherwise we start a new lc. todo add option
-long max_delta_usec_begin_earlier = 15 * usecs_per_sec; // max 15s. the sec_begin get's adjusted. this msg moves the lc start max 15s earlier. todo add option
+long max_delta_usec_end_extended = 0 * usecs_per_sec; // max 4s. the end get's extended by this message. otherwise we start a new lc. todo add option
+long max_delta_usec_begin_earlier = 1 * usecs_per_sec; // max 5s. the sec_begin get's adjusted. this msg moves the lc start max 15s earlier. todo add option
 
 void print_usage()
 {
@@ -552,7 +552,7 @@ bool Lifecycle::fitsin(const DltMessage &m)
       used by some ECU dlt implementations...
      
      */
-    
+    bool toret = false;
     // if tmsp is 0 we claim it fits but actually throw it away (see above)
     if (m.headerextra.tmsp==0){
         // msgs.push_back((DltMessage *)&m);
@@ -569,29 +569,66 @@ bool Lifecycle::fitsin(const DltMessage &m)
     // so if this message belongs to this lifecycle there would be
     // new_sec_begin = min(sec_begin, m_abs_lc_starttime)
     // the message would have been send at: m_tx = sec_begin + msg_timestamp.
-    // if this fits clearly within the end range then we assume the message belongs to this one
-    // and update sec_begin accordingly
-    // we need to ranges to judge:
-    // a) the end get's extended by this message: max_delta_sec_end_extended
-    // b) the sec_begin get's adjusted: max_delta_sec_begin_earlier
+    // if the message fits clearly we and update sec_begin and sec_end accordingly
     
     int64_t new_usec_begin = min(usec_begin, m_abs_lc_starttime);
-    int64_t m_tx = new_usec_begin + msg_timestamp;
+    int64_t m_new_tx = new_usec_begin + msg_timestamp;
+    int64_t m_org_tx = m_abs_lc_starttime + msg_timestamp;
     
-    if (((new_usec_begin + max_delta_usec_begin_earlier) >= usec_begin) &&
-        (m_tx <= (usec_end+max_delta_usec_end_extended))){
-        // ok belongs to this one.
-        if (new_usec_begin<usec_begin) usec_begin = new_usec_begin;
-        if (m_tx > usec_end) usec_end = m_tx;
-        msgs.push_back((DltMessage *)&m);
-        
-        if (min_tmsp > m.headerextra.tmsp) min_tmsp = m.headerextra.tmsp;
-        if (max_tmsp < m.headerextra.tmsp) max_tmsp = m.headerextra.tmsp;
-        
-        return true;
+    // the m_abs_lc_starttime can only be ge (>=) the real abs_lc_starttime as
+    // the jitter can only be positive.
+    // so if the m_abs_lc_starttime is within sec_begin and sec_end we can trust
+    // this message:
+    
+    // so this is a 100% safe check (uncorrelated start time within the current lifecycle)
+    if ((m_abs_lc_starttime >= usec_begin) && (m_abs_lc_starttime <= usec_end))
+    {
+        toret = true;
     }
     
-    return false;
+    // another check:
+    // if the begin is before the current end
+    // but the msg tx time is after our begin (by this we avoid to misdetect
+    // lifecycles directly before the current one)
+    // we treat it as part of this one
+    
+    // so this is a 100% safe check as well (uncorrelated start before end but uncor. tx within current lc)
+    if (!toret
+        && (m_abs_lc_starttime <= usec_end)
+        && (m_org_tx >= usec_begin))
+    {
+        toret = true;
+    }
+
+    // if the new start would be slightly before the current one and
+    // the start incl. jitter is before the end
+    // and the new m_tx time would extend just slightly this lc:
+    // this check is not 100% safe but using the delta windows as heuristics.
+    if (false && ((new_usec_begin + max_delta_usec_begin_earlier) >= usec_begin) &&
+        (m_abs_lc_starttime <= usec_end) &&
+        (m_new_tx <= (usec_end+max_delta_usec_end_extended)))
+    {
+        toret = true;
+    }
+    
+    if (toret){
+        // ok belongs to this one.
+        if (new_usec_begin<usec_begin) usec_begin = new_usec_begin;
+        
+        // to determine/extend the end of the lifecycle we can use the
+        // abs time when the message was received by the logger as
+        // processing jitter can not occur between lifecycles
+        if (m_org_tx>usec_end)
+            usec_end = m_org_tx;
+        
+        msgs.push_back((DltMessage *)&m);
+        
+        // update min/max tmsp:
+        if (min_tmsp > m.headerextra.tmsp) min_tmsp = m.headerextra.tmsp;
+        if (max_tmsp < m.headerextra.tmsp) max_tmsp = m.headerextra.tmsp;
+    }
+    
+    return toret;
 }
 
 

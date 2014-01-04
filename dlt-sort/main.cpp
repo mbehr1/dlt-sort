@@ -300,7 +300,7 @@ int process_input(std::ifstream &fin)
                 fin.read((char*)msg->standardheader, sizeof(*msg->standardheader));
                 remaining -= sizeof(*msg->standardheader);
                 // verify header (somehow)
-                uint16_t len = DLT_BETOH_16(msg->standardheader->len); // fixme: why that? the macro should work! DLT_ENDIAN_GET_16(hstd.htyp, hstd.len); // len is without storage header (but with stdh)
+                uint16_t len = DLT_BETOH_16(msg->standardheader->len); // why that? the macro should work! DLT_ENDIAN_GET_16(hstd.htyp, hstd.len); // len is without storage header (but with stdh)
                 if (len<=sizeof(*msg->standardheader)){
                     cerr << "msg len <= sizeof(DltStandardHeader). Stopping processing this file!\n";
                     remaining = -4;
@@ -482,8 +482,8 @@ int determine_lcs(ECU_Info &ecu)
                 // create a new lifecycle based on the msg and set l to this one
                 if (!found_other){
                     Lifecycle new_lc(**it);
-                    ecu.lcs.push_back(new_lc); // todo we could use a sorted list here
-                    cur_l = ecu.lcs.end(); // (if sorted we need to find it in a different way)
+                    ecu.lcs.push_back(new_lc); // will be sorted later. so it doesn't matter where we add them
+                    cur_l = ecu.lcs.end(); // get the one inserted
                     --cur_l; // end points to a non existing element.
                 }
             } // else fits in cur_l -> next msg
@@ -607,8 +607,6 @@ bool Lifecycle::fitsin(const DltMessage &m)
      at a different time and are thus unreliable.
      todo: simply add those messages if they fit by the sh_tx time within that lifecycle.
      
-     todo: add support for abs tmsp (vs. rel. as required by dlt spec) as this seems to be 
-      used by some ECU dlt implementations...
      
      */
     bool toret = false;
@@ -867,7 +865,7 @@ bool OverallLC::output_to_fstream(std::ofstream &f)
     
     while(vec.size()>0){ // just one item remaining:
         assert(vec.size()==1);
-        // todo output the msgs:
+        // output the msgs sequentially:
         LC_it &l=vec[0];
         for(; l.it!=l.end; ++l.it){
             output_message(*(l.it), f); // take care. after this call the message is corrupt! (endianess...)
@@ -909,9 +907,14 @@ std::ofstream *get_ofstream(int cnt, std::string &templ)
 {
     std::string name(templ);
     if (cnt>0){
+        // do we have to remove the extension ".dlt" first?
+        if (name.compare(name.length()-4, 4, ".dlt")==0){
+            // remove the .extension. will be added later again
+            name.erase(name.length()-4, 4);
+        }
         // we have to add _xxx to the filename
         char nr[20];
-        snprintf(nr, 19, "%03d", cnt); // todo as we now the max number upfront we could just use an many digits as needed
+        snprintf(nr, 19, "%03d", cnt); // todo as we know the max number upfront we could just use an many digits as needed
         name.append(nr);
         // but before the ".dlt"
         name.append(".dlt");

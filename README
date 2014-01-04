@@ -27,7 +27,11 @@ g++ main.cpp -o dlt_sort[.exe] -I <path_to_dlt_include_dir>
 
 Usage:
 
-see dlt_sort --help
+dlt-sort [options] input-file input-file ...
+ -s --split    split output file automatically one for each lifecycle
+ -f --file outputfilename (default dlt_sorted.dlt). If split is active xxx.dlt will be added automatically.
+ -h --help     show usage/help
+ -v --verbose  set verbose level to 1 (increase by adding more -v)
 
 Examples:
 
@@ -46,6 +50,14 @@ sorted by dlt timestamp (and adjusted if they are from multiple ecus.)
 will generate files named dlt_sorted_001.dlt (and ..._xxx.dlt).
 
 More to follow.
+
+
+Todos:
+
+- add proper license (MPL or GPLv2 or ...)
+- feature: adjust abs timestamps to sorted ones
+
+
 
 Matthias Behr, 2.1.2014
 

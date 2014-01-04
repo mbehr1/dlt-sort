@@ -28,7 +28,7 @@
 
 using namespace std;
 
-const char* const dlt_sort_version="0.7";
+const char* const dlt_sort_version="0.8";
 
 const long usecs_per_sec = 1000000L;
 
@@ -39,6 +39,7 @@ void print_usage()
     cout << "usage dlt-sort [options] input-file input-file ...\n";
     cout << " -s --split    split output file automatically one for each lifecycle\n";
     cout << " -f --file outputfilename (default dlt_sorted.dlt). If split is active xxx.dlt will be added automatically.\n";
+    cout << " -t --timestamps adjust time in storageheader to detected lifecycle time. Changes the orig. logs!\n";
     cout << " -h --help     show usage/help\n";
     cout << " -v --verbose  set verbose level to 1 (increase by adding more -v)\n";
 }
@@ -77,7 +78,7 @@ public:
     OverallLC():usec_begin(0), usec_end(0) {};
     OverallLC(const Lifecycle&);
     bool expand_if_intersects(const Lifecycle &);
-    bool output_to_fstream(std::ofstream &f);
+    bool output_to_fstream(std::ofstream &f, bool timeadjust);
     void debug_print() const;
     // member vars:
     int64_t usec_begin;
@@ -91,6 +92,7 @@ typedef struct{
     LIST_OF_MSGS::iterator it;
     LIST_OF_MSGS::iterator end;
     int64_t min_time;
+    int64_t usec_begin;
 } LC_it;
 typedef std::vector<LC_it> VEC_OF_LC_it;
 
@@ -121,7 +123,8 @@ int main(int argc, char * argv[])
     }
 
     int c, option_index;
-    int do_split=0; // by default don't split output files per lifecycle
+    bool do_split=false; // by default don't split output files per lifecycle
+    bool do_timeadjust=false; // by default don't adjust timestamps in generated dlt file
     std::string ofilename ("dlt_sorted.dlt");
     
     static struct option long_options[] =
@@ -132,11 +135,12 @@ int main(int argc, char * argv[])
         /* These options don't set a flag.
          We distinguish them by their indices. */
         {"split",     no_argument,       0, 's'},
+        {"timestamps", no_argument, 0, 't'},
         {"file",    required_argument, 0, 'f'},
         {"help", no_argument, 0, 'h'},
         {0, 0, 0, 0}
     };
-    while ((c = getopt_long (argc, argv, "vhsf:", long_options, &option_index))!= -1){
+    while ((c = getopt_long (argc, argv, "vhstf:", long_options, &option_index))!= -1){
         switch(c)
         {
             case 0:
@@ -155,8 +159,12 @@ int main(int argc, char * argv[])
                 abort();
                 break;
             case 's':
-                do_split=1;
+                do_split=true;
                 if(verbose) cout << " splitting output files by lifecycles\n";
+                break;
+                case 't':
+                do_timeadjust = true;
+                cout <<" adjusting timestamps. This changes the orig. logs!\n";
                 break;
             case 'f':
                 ofilename=std::string (optarg);
@@ -178,7 +186,6 @@ int main(int argc, char * argv[])
     // print some verbose infos:
     if (verbose){
         cout << " set verbose level to " << verbose << endl;
-        cout << " sizeof DltStorageHeader = " << sizeof(DltStorageHeader) << endl;
     }
     
     // let's process the input files:
@@ -257,7 +264,7 @@ int main(int argc, char * argv[])
             if (f) f->close();
             f=get_ofstream(f_cnt, ofilename);
         }
-        (*it).output_to_fstream(*f); // todo error handling
+        (*it).output_to_fstream(*f, do_timeadjust); // todo error handling
         ++f_cnt;
     }
     if (f) f->close();
@@ -765,7 +772,7 @@ bool OverallLC::expand_if_intersects(const Lifecycle &lc)
     return true;
 }
 
-bool OverallLC::output_to_fstream(std::ofstream &f)
+bool OverallLC::output_to_fstream(std::ofstream &f, bool timeadjust)
 {
     /* this is the main function to output/merge the different lifecycles
      belonging to an overall lifecycle.
@@ -797,6 +804,7 @@ bool OverallLC::output_to_fstream(std::ofstream &f)
         l.it = (*it).msgs.begin();
         l.end = (*it).msgs.end();
         l.min_time= (*it).calc_min_time();
+        l.usec_begin = (*it).usec_begin;
         vec.push_back(l);
     }
     while(vec.size()>1){ // as long as we have at least two msg lists to take care of:
@@ -830,13 +838,21 @@ bool OverallLC::output_to_fstream(std::ofstream &f)
         
         // now output msgs from index until time >next time:
         do{
-            int64_t tmsp = 100LL*((int64_t)((*(index->it))->headerextra.tmsp)); // this needs to be done before output_message!
-            output_message(*(index->it), f); // see below!
+            DltMessage *msg=*(index->it);
+            int64_t tmsp = 100LL*((int64_t)(msg->headerextra.tmsp)); // this needs to be done before output_message!
+            if (timeadjust){
+                // change the DltMessage
+                int64_t t = index->usec_begin + (((int64_t)msg->headerextra.tmsp) * 100LL);
+                msg->storageheader->seconds = (uint32_t)(t / usecs_per_sec);
+                msg->storageheader->microseconds = t % usecs_per_sec;
+            }
+            output_message(msg, f); // see below!
             ++(index->it);
+            msg = *(index->it); // in case somebody uses it from now on.
             if (index->it != index->end){
                 // update LC_it
                 index->min_time -= tmsp;
-                index->min_time += 100LL*((int64_t)((*(index->it))->headerextra.tmsp));
+                index->min_time += 100LL*((int64_t)(msg->headerextra.tmsp));
             }else{
                 // emptied this lc! we need to delete this element
                 for (VEC_OF_LC_it::iterator j=vec.begin(); (NULL!=index) && (j!=vec.end()); ++j){
@@ -868,7 +884,14 @@ bool OverallLC::output_to_fstream(std::ofstream &f)
         // output the msgs sequentially:
         LC_it &l=vec[0];
         for(; l.it!=l.end; ++l.it){
-            output_message(*(l.it), f); // take care. after this call the message is corrupt! (endianess...)
+            DltMessage *msg = *(l.it);
+            if (timeadjust){
+                // change the DltMessage
+                int64_t t = l.usec_begin + (((int64_t)msg->headerextra.tmsp) * 100LL);
+                msg->storageheader->seconds = (uint32_t)(t / usecs_per_sec);
+                msg->storageheader->microseconds = t % usecs_per_sec;
+            }
+            output_message(msg, f); // take care. after this call the message is corrupt! (endianess...)
         }
         vec.erase(vec.begin());
     }

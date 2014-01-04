@@ -28,6 +28,7 @@
 		AE1806B618732BD800E83589 /* dlt-sort */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "dlt-sort"; sourceTree = BUILT_PRODUCTS_DIR; };
 		AE1806B918732BD800E83589 /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
 		AE1806BB18732BD800E83589 /* dlt_sort.1 */ = {isa = PBXFileReference; lastKnownFileType = text.man; path = dlt_sort.1; sourceTree = "<group>"; };
+		AE1806C21875FA3600E83589 /* README */ = {isa = PBXFileReference; lastKnownFileType = text; path = README; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -62,6 +63,7 @@
 			children = (
 				AE1806B918732BD800E83589 /* main.cpp */,
 				AE1806BB18732BD800E83589 /* dlt_sort.1 */,
+				AE1806C21875FA3600E83589 /* README */,
 			);
 			path = "dlt-sort";
 			sourceTree = "<group>";

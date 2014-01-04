@@ -169,6 +169,12 @@ int main(int argc, char * argv[])
     argc-=optind;
     argv+=optind;
     
+	// some assertions:
+	assert(sizeof(DltStorageHeader) == 16);
+	assert(sizeof(DltStandardHeader) == 4);
+	assert(sizeof(DltStandardHeaderExtra) == 12);
+	assert(sizeof(DltExtendedHeader) == 10);
+
     // print some verbose infos:
     if (verbose){
         cout << " set verbose level to " << verbose << endl;
@@ -179,7 +185,7 @@ int main(int argc, char * argv[])
     for (option_index=0; option_index<argc; option_index++){
         printf("Processing file %s:\n", argv[option_index]);
         std::ifstream fin;
-        fin.open(argv[option_index], ios::in);
+        fin.open(argv[option_index], ios::in|ios::binary);
         if (fin.is_open()){
             
             (void)process_input(fin); // and ignore parsing errors. just continue with next file
@@ -522,6 +528,7 @@ int merge_lcs(ECU_Info &ecu)
                     // now we need to delete j
                     assert((*j).msgs.size()==0);
                     ecu.lcs.erase(j);
+                    j = ecu.lcs.begin(); // safer as otherwise it might be accessed after the deletion.
                     merged=true;
                 }
             }
@@ -834,6 +841,7 @@ bool OverallLC::output_to_fstream(std::ofstream &f)
                 for (VEC_OF_LC_it::iterator j=vec.begin(); (NULL!=index) && (j!=vec.end()); ++j){
                     if (index==&(*j)){
                         vec.erase(j);
+                        j = vec.begin(); // safer as otherwise it might be accessed after deletion!
                         index=NULL;
                     }
                 }

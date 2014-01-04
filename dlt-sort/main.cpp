@@ -22,7 +22,7 @@
 #include <getopt.h>
 #include <dlt/dlt_common.h>
 
-#ifndef snprintf // M$ doesnt seem to like (yet) snprintf
+#ifdef WIN32 // M$ doesnt seem to like (yet) snprintf
 #define snprintf _snprintf_s
 #endif
 

@@ -11,6 +11,8 @@
 #include <list>
 #include <map>
 #include <vector>
+#include <algorithm> // for min
+#include <string>
 
 #include <stdlib.h> // for abort
 #include <string.h> // for memcpy
@@ -19,6 +21,10 @@
 
 #include <getopt.h>
 #include <dlt/dlt_common.h>
+
+#ifndef snprintf // M$ doesnt seem to like (yet) snprintf
+#define snprintf _snprintf_s
+#endif
 
 using namespace std;
 
@@ -154,7 +160,7 @@ int main(int argc, char * argv[])
                 break;
             case 'f':
                 ofilename=std::string (optarg);
-                if(verbose) cout << " using <" << ofilename<< "> as output file name\n";
+                if(verbose) cout << " using <" << ofilename << "> as output file name\n";
                 break;
             default:
                 abort();

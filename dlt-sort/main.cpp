@@ -28,7 +28,7 @@
 
 using namespace std;
 
-const char* const dlt_sort_version="0.6";
+const char* const dlt_sort_version="0.7";
 
 const long usecs_per_sec = 1000000L;
 

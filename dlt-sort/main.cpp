@@ -109,6 +109,11 @@ int main(int argc, char * argv[])
 {
     cout << "dlt-sort (v" << dlt_sort_version << ") (c) 2013, 2014 Matthias Behr\n";
     
+    if (argc==1){
+        print_usage();
+        return -1;
+    }
+
     int c, option_index;
     int do_split=0; // by default don't split output files per lifecycle
     std::string ofilename ("dlt_sorted.dlt");

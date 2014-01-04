@@ -219,15 +219,18 @@ int main(int argc, char * argv[])
         char ecu[5];
         ecu[4]=0;
         memcpy(ecu, (char*) &it->first, sizeof(uint32_t));
-        cout << "ECU <" << ecu << "> contains " << info.lcs.size() << " lifecycle\n";
+        unsigned long nr_lcs = info.lcs.size();
+        cout << "ECU <" << ecu << "> contains " << nr_lcs << " lifecycle\n";
         debug_print(info.lcs);
         
         // now see whether they overall (the detection does not always work 100%
         // esp. on short lifecycles:
         merge_lcs(info);
         sort_msgs_lcs(info);
-        cout << "ECU <" << ecu << "> contains " << info.lcs.size() << " lifecycle after merge:\n";
-        debug_print(info.lcs);
+        if (info.lcs.size() != nr_lcs){
+            cout << "ECU <" << ecu << "> contains " << info.lcs.size() << " lifecycle after merge:\n";
+            debug_print(info.lcs);
+        }
     }
     
     /* now determine the set of lifecycles that belong to each other 
@@ -725,7 +728,7 @@ void Lifecycle::debug_print() const
     
     cout << " LC from " << ctime(&sbeg) << "      to ";
     cout << ctime(&send);
-    cout << " min_tmsp=" << min_tmsp << " max_tmsp=" << max_tmsp << endl;
+    cout << "  min_tmsp=" << min_tmsp << " max_tmsp=" << max_tmsp << endl;
     cout << "  num_msgs = " << msgs.size() << endl;
 }
 

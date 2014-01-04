@@ -12,6 +12,9 @@ Main purpose:
   time and not by the time of arrival at the logger. See details below.
 - Detect different lifecycles within the log files and split the log files 
   automatically by lifecycles.
+- Adjust dlt storageheader (the ones added by the logger) times to the times
+  where the msg has been send (i.e. detected lifecycle start time plus timestamp).
+  Turned off by default but can be enabled with option '-t'.
 
 
 To build:
@@ -30,6 +33,7 @@ Usage:
 dlt-sort [options] input-file input-file ...
  -s --split    split output file automatically one for each lifecycle
  -f --file outputfilename (default dlt_sorted.dlt). If split is active xxx.dlt will be added automatically.
+ -t --timestamps adjust time in storageheader to detected lifecycle time. Changes the orig. logs!
  -h --help     show usage/help
  -v --verbose  set verbose level to 1 (increase by adding more -v)
 
@@ -55,7 +59,7 @@ More to follow.
 Todos:
 
 - add proper license (MPL or GPLv2 or ...)
-- feature: adjust abs timestamps to sorted ones
++ done since v0.8: feature: adjust abs timestamps to sorted ones
 
 
 

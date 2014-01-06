@@ -226,7 +226,7 @@ int main(int argc, char * argv[])
         char ecu[5];
         ecu[4]=0;
         memcpy(ecu, (char*) &it->first, sizeof(uint32_t));
-        unsigned long nr_lcs = info.lcs.size();
+        size_t nr_lcs = info.lcs.size();
         cout << "ECU <" << ecu << "> contains " << nr_lcs << " lifecycle\n";
         debug_print(info.lcs);
         
@@ -848,12 +848,13 @@ bool OverallLC::output_to_fstream(std::ofstream &f, bool timeadjust)
             }
             output_message(msg, f); // see below!
             ++(index->it);
-            msg = *(index->it); // in case somebody uses it from now on.
             if (index->it != index->end){
+                msg = *(index->it); // in case somebody uses it from now on.
                 // update LC_it
                 index->min_time -= tmsp;
                 index->min_time += 100LL*((int64_t)(msg->headerextra.tmsp));
             }else{
+				msg = NULL; // in case somebody uses it
                 // emptied this lc! we need to delete this element
                 for (VEC_OF_LC_it::iterator j=vec.begin(); (NULL!=index) && (j!=vec.end()); ++j){
                     if (index==&(*j)){

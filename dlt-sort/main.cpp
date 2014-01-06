@@ -28,7 +28,7 @@
 
 using namespace std;
 
-const char* const dlt_sort_version="0.8";
+const char* const dlt_sort_version="0.9";
 
 const long usecs_per_sec = 1000000L;
 
@@ -269,8 +269,16 @@ int main(int argc, char * argv[])
     }
     if (f) f->close();
     
-    // free memory:
-    // tbd!
+    // free memory: (not really needed as we exit anyhow here but to make valgrind,... happy:
+    for (MAP_OF_ECUS::iterator it = map_ecus.begin(); it != map_ecus.end(); ++it){
+       if (verbose>=2) cout << "deallocating " << it->second.msgs.size() << " msgs\n";
+        for (LIST_OF_MSGS::iterator j = it->second.msgs.begin(); j != it->second.msgs.end(); ++j){
+            DltMessage *m = *j;
+            if (m->databuffer) delete m->databuffer;
+            delete m;
+        }
+    }
+
     
     return 0; // no error (<0 for error)
 }

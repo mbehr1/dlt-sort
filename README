@@ -13,7 +13,7 @@ Main purpose:
 - Detect different lifecycles within the log files and split the log files 
   automatically by lifecycles.
 - Adjust dlt storageheader (the ones added by the logger) times to the times
-  where the msg has been send (i.e. detected lifecycle start time plus timestamp).
+  where the msg has been sent (i.e. detected lifecycle start time plus timestamp).
   Turned off by default but can be enabled with option '-t'.
 
 

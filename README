@@ -59,6 +59,7 @@ More to follow.
 Todos:
 
 - add proper license (MPL or GPLv2 or ...)
+- add wildcard search as Windows "cmd" doesn't do it automatically
 + done since v0.8: feature: adjust abs timestamps to sorted ones
 
 

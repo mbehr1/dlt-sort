@@ -10,8 +10,8 @@
 		AE1806BA18732BD800E83589 /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AE1806B918732BD800E83589 /* main.cpp */; };
 		AE1806BC18732BD800E83589 /* dlt_sort.1 in CopyFiles */ = {isa = PBXBuildFile; fileRef = AE1806BB18732BD800E83589 /* dlt_sort.1 */; };
 		AE1FEAB918818CA80040DBD2 /* dlt_sort_unittests.1 in CopyFiles */ = {isa = PBXBuildFile; fileRef = AE1FEAB818818CA80040DBD2 /* dlt_sort_unittests.1 */; };
-		AE1FEABE18818CD50040DBD2 /* gtest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AE1FEABD18818CD50040DBD2 /* gtest.framework */; };
 		AE1FEAC1188190C90040DBD2 /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AE1FEAB618818CA80040DBD2 /* main.cpp */; };
+		AE1FEAC318819EB80040DBD2 /* gtest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AE1FEAC218819EB80040DBD2 /* gtest.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -46,7 +46,7 @@
 		AE1FEAB418818CA80040DBD2 /* dlt-sort-unittests */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "dlt-sort-unittests"; sourceTree = BUILT_PRODUCTS_DIR; };
 		AE1FEAB618818CA80040DBD2 /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
 		AE1FEAB818818CA80040DBD2 /* dlt_sort_unittests.1 */ = {isa = PBXFileReference; lastKnownFileType = text.man; path = dlt_sort_unittests.1; sourceTree = "<group>"; };
-		AE1FEABD18818CD50040DBD2 /* gtest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = gtest.framework; path = ../../googletest/build/gtest.framework; sourceTree = "<group>"; };
+		AE1FEAC218819EB80040DBD2 /* gtest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = gtest.framework; path = ../../../../../../private/tmp/gtest.dst/Library/Frameworks/gtest.framework; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -61,7 +61,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				AE1FEABE18818CD50040DBD2 /* gtest.framework in Frameworks */,
+				AE1FEAC318819EB80040DBD2 /* gtest.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -71,7 +71,7 @@
 		AE1806AD18732BD700E83589 = {
 			isa = PBXGroup;
 			children = (
-				AE1FEABD18818CD50040DBD2 /* gtest.framework */,
+				AE1FEAC218819EB80040DBD2 /* gtest.framework */,
 				AE1806B818732BD800E83589 /* dlt-sort */,
 				AE1FEAB518818CA80040DBD2 /* dlt-sort-unittests */,
 				AE1806B718732BD800E83589 /* Products */,
@@ -288,10 +288,15 @@
 		AE1FEABB18818CA80040DBD2 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_CXX_LANGUAGE_STANDARD = "compiler-default";
+				CLANG_CXX_LIBRARY = "compiler-default";
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
 					/Users/mbehr/Documents/develop/googletest/build,
+					/private/tmp/gtest.dst/Library/Frameworks,
 				);
+				GCC_C_LANGUAGE_STANDARD = c99;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"DEBUG=1",
 					"$(inherited)",
@@ -309,10 +314,15 @@
 		AE1FEABC18818CA80040DBD2 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_CXX_LANGUAGE_STANDARD = "compiler-default";
+				CLANG_CXX_LIBRARY = "compiler-default";
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
 					/Users/mbehr/Documents/develop/googletest/build,
+					/private/tmp/gtest.dst/Library/Frameworks,
 				);
+				GCC_C_LANGUAGE_STANDARD = c99;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
 				HEADER_SEARCH_PATHS = (
 					"$(inherited)",
 					/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/include,

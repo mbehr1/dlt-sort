@@ -12,6 +12,8 @@
 		AE1FEAB918818CA80040DBD2 /* dlt_sort_unittests.1 in CopyFiles */ = {isa = PBXBuildFile; fileRef = AE1FEAB818818CA80040DBD2 /* dlt_sort_unittests.1 */; };
 		AE1FEAC1188190C90040DBD2 /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AE1FEAB618818CA80040DBD2 /* main.cpp */; };
 		AE1FEAC318819EB80040DBD2 /* gtest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AE1FEAC218819EB80040DBD2 /* gtest.framework */; };
+		AE1FEAC51881A3770040DBD2 /* dlt_sort.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AE1FEAC41881A3770040DBD2 /* dlt_sort.cpp */; };
+		AE1FEAC61881A3770040DBD2 /* dlt_sort.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AE1FEAC41881A3770040DBD2 /* dlt_sort.cpp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -47,6 +49,7 @@
 		AE1FEAB618818CA80040DBD2 /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
 		AE1FEAB818818CA80040DBD2 /* dlt_sort_unittests.1 */ = {isa = PBXFileReference; lastKnownFileType = text.man; path = dlt_sort_unittests.1; sourceTree = "<group>"; };
 		AE1FEAC218819EB80040DBD2 /* gtest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = gtest.framework; path = ../../../../../../private/tmp/gtest.dst/Library/Frameworks/gtest.framework; sourceTree = "<group>"; };
+		AE1FEAC41881A3770040DBD2 /* dlt_sort.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = dlt_sort.cpp; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -94,6 +97,7 @@
 				AE1806BB18732BD800E83589 /* dlt_sort.1 */,
 				AE1806C21875FA3600E83589 /* README */,
 				AE1FEAAF188187740040DBD2 /* dlt-sort.h */,
+				AE1FEAC41881A3770040DBD2 /* dlt_sort.cpp */,
 			);
 			path = "dlt-sort";
 			sourceTree = "<group>";
@@ -176,6 +180,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AE1FEAC51881A3770040DBD2 /* dlt_sort.cpp in Sources */,
 				AE1806BA18732BD800E83589 /* main.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -184,6 +189,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AE1FEAC61881A3770040DBD2 /* dlt_sort.cpp in Sources */,
 				AE1FEAC1188190C90040DBD2 /* main.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

@@ -9,6 +9,8 @@
 #ifndef dlt_sort_dlt_sort_h
 #define dlt_sort_dlt_sort_h
 
+#include <assert.h>
+#include <algorithm> // for min
 #include <iostream>
 #include <fstream>
 #include <string>
@@ -17,6 +19,9 @@
 #include <vector>
 
 #include <dlt/dlt_common.h>
+
+const long usecs_per_sec = 1000000L;
+extern int verbose;
 
 /* type definitions */
 
@@ -83,6 +88,7 @@ void debug_print(const LIST_OF_OLCS &);
 int determine_overall_lcs();
 std::ofstream *get_ofstream(int cnt, std::string &name);
 
-
+extern MAP_OF_ECUS map_ecus;
+extern LIST_OF_OLCS list_olcs;
 
 #endif

@@ -14,6 +14,16 @@ int verbose = 0;
 MAP_OF_ECUS map_ecus;
 LIST_OF_OLCS list_olcs;
 
+void init_DltMessage(DltMessage &msg){
+    msg.found_serialheader=0;
+    msg.resync_offset=0;
+    msg.storageheader = (DltStorageHeader *)&msg.headerbuffer[0];
+    msg.standardheader = (DltStandardHeader *)&msg.headerbuffer[sizeof(DltStorageHeader)];
+    msg.extendedheader = (DltExtendedHeader *)&msg.headerbuffer[sizeof(DltStorageHeader)+sizeof(DltStandardHeader)];
+    msg.headersize = -1; // not calculated yet
+    msg.datasize=-1; // not calculated yet
+}
+
 Lifecycle::Lifecycle(const DltMessage &m)
 {
     usec_begin = m.storageheader->seconds;
@@ -203,13 +213,7 @@ int process_input(std::ifstream &fin)
     int64_t remaining = file_length;
     while(remaining>=(int64_t)sizeof(DltStorageHeader)){
         DltMessage *msg=new DltMessage;
-        msg->found_serialheader=0;
-        msg->resync_offset=0;
-        msg->storageheader = (DltStorageHeader *)&msg->headerbuffer[0];
-        msg->standardheader = (DltStandardHeader *)&msg->headerbuffer[sizeof(DltStorageHeader)];
-        msg->extendedheader = (DltExtendedHeader *)&msg->headerbuffer[sizeof(DltStorageHeader)+sizeof(DltStandardHeader)];
-        msg->headersize = -1; // not calculated yet
-        msg->datasize=-1; // not calculated yet
+        init_DltMessage(*msg);
         
         // check for dlt storage header:
         fin.read((char*)msg->storageheader, sizeof(*msg->storageheader));

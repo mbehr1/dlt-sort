@@ -76,6 +76,7 @@ typedef struct{
 typedef std::vector<LC_it> VEC_OF_LC_it;
 
 /* prototype declarations */
+void init_DltMessage(DltMessage &);
 int process_input(std::ifstream &);
 int process_message(DltMessage *msg);
 int output_message(DltMessage *msg, std::ofstream &f);

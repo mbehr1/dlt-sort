@@ -81,13 +81,16 @@ int process_input(std::ifstream &);
 int process_message(DltMessage *msg);
 int output_message(DltMessage *msg, std::ofstream &f);
 int determine_lcs(ECU_Info &);
+bool compare_tmsp(const DltMessage *first, const DltMessage *second);
 int sort_msgs_lcs(ECU_Info &);
+bool compare_usecbegin(const OverallLC &first, const OverallLC &second);
 int merge_lcs(ECU_Info &);
 
 void debug_print(const LIST_OF_LCS &);
 void debug_print(const LIST_OF_OLCS &);
 int determine_overall_lcs();
-std::ofstream *get_ofstream(int cnt, std::string &name);
+std::string get_ofstream_name(int cnt, std::string const &templ);
+std::ofstream *get_ofstream(int cnt, std::string const &name);
 
 extern MAP_OF_ECUS map_ecus;
 extern LIST_OF_OLCS list_olcs;

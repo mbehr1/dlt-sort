@@ -25,7 +25,7 @@ use the provided XCode project.
 
 under Linux/Windows:
 
-g++ main.cpp -o dlt_sort[.exe] -I . -I <path_to_dlt_include_dir>
+g++ main.cpp dlt_sort.cpp -o dlt_sort[.exe] -I . -I <path_to_dlt_include_dir>
 
 
 Usage:

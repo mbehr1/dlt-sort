@@ -671,7 +671,7 @@ int determine_overall_lcs()
     return 0; // success
 }
 
-std::ofstream *get_ofstream(int cnt, std::string &templ)
+std::string get_ofstream_name(int cnt, std::string const &templ)
 {
     std::string name(templ);
     if (cnt>0){
@@ -687,6 +687,12 @@ std::ofstream *get_ofstream(int cnt, std::string &templ)
         // but before the ".dlt"
         name.append(".dlt");
     }
+    return name;
+}
+
+std::ofstream *get_ofstream(int cnt, std::string const &templ)
+{
+    std::string name(get_ofstream_name(cnt, templ));
     // now open the file:
     std::ofstream *f=new std::ofstream;
     f->open(name.c_str(), ios_base::out | ios_base::binary | ios_base::trunc);

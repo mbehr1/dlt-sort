@@ -9,6 +9,9 @@
 /* Begin PBXBuildFile section */
 		AE1806BA18732BD800E83589 /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AE1806B918732BD800E83589 /* main.cpp */; };
 		AE1806BC18732BD800E83589 /* dlt_sort.1 in CopyFiles */ = {isa = PBXBuildFile; fileRef = AE1806BB18732BD800E83589 /* dlt_sort.1 */; };
+		AE1FEAB918818CA80040DBD2 /* dlt_sort_unittests.1 in CopyFiles */ = {isa = PBXBuildFile; fileRef = AE1FEAB818818CA80040DBD2 /* dlt_sort_unittests.1 */; };
+		AE1FEABE18818CD50040DBD2 /* gtest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AE1FEABD18818CD50040DBD2 /* gtest.framework */; };
+		AE1FEAC1188190C90040DBD2 /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AE1FEAB618818CA80040DBD2 /* main.cpp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -22,6 +25,16 @@
 			);
 			runOnlyForDeploymentPostprocessing = 1;
 		};
+		AE1FEAB218818CA80040DBD2 /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = /usr/share/man/man1/;
+			dstSubfolderSpec = 0;
+			files = (
+				AE1FEAB918818CA80040DBD2 /* dlt_sort_unittests.1 in CopyFiles */,
+			);
+			runOnlyForDeploymentPostprocessing = 1;
+		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
@@ -30,6 +43,10 @@
 		AE1806BB18732BD800E83589 /* dlt_sort.1 */ = {isa = PBXFileReference; lastKnownFileType = text.man; path = dlt_sort.1; sourceTree = "<group>"; };
 		AE1806C21875FA3600E83589 /* README */ = {isa = PBXFileReference; lastKnownFileType = text; path = README; sourceTree = SOURCE_ROOT; };
 		AE1FEAAF188187740040DBD2 /* dlt-sort.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "dlt-sort.h"; sourceTree = "<group>"; };
+		AE1FEAB418818CA80040DBD2 /* dlt-sort-unittests */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "dlt-sort-unittests"; sourceTree = BUILT_PRODUCTS_DIR; };
+		AE1FEAB618818CA80040DBD2 /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
+		AE1FEAB818818CA80040DBD2 /* dlt_sort_unittests.1 */ = {isa = PBXFileReference; lastKnownFileType = text.man; path = dlt_sort_unittests.1; sourceTree = "<group>"; };
+		AE1FEABD18818CD50040DBD2 /* gtest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = gtest.framework; path = ../../googletest/build/gtest.framework; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -40,13 +57,23 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		AE1FEAB118818CA80040DBD2 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AE1FEABE18818CD50040DBD2 /* gtest.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		AE1806AD18732BD700E83589 = {
 			isa = PBXGroup;
 			children = (
+				AE1FEABD18818CD50040DBD2 /* gtest.framework */,
 				AE1806B818732BD800E83589 /* dlt-sort */,
+				AE1FEAB518818CA80040DBD2 /* dlt-sort-unittests */,
 				AE1806B718732BD800E83589 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -55,6 +82,7 @@
 			isa = PBXGroup;
 			children = (
 				AE1806B618732BD800E83589 /* dlt-sort */,
+				AE1FEAB418818CA80040DBD2 /* dlt-sort-unittests */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -68,6 +96,15 @@
 				AE1FEAAF188187740040DBD2 /* dlt-sort.h */,
 			);
 			path = "dlt-sort";
+			sourceTree = "<group>";
+		};
+		AE1FEAB518818CA80040DBD2 /* dlt-sort-unittests */ = {
+			isa = PBXGroup;
+			children = (
+				AE1FEAB618818CA80040DBD2 /* main.cpp */,
+				AE1FEAB818818CA80040DBD2 /* dlt_sort_unittests.1 */,
+			);
+			path = "dlt-sort-unittests";
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -88,6 +125,23 @@
 			name = "dlt-sort";
 			productName = "dlt-sort";
 			productReference = AE1806B618732BD800E83589 /* dlt-sort */;
+			productType = "com.apple.product-type.tool";
+		};
+		AE1FEAB318818CA80040DBD2 /* dlt-sort-unittests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AE1FEABA18818CA80040DBD2 /* Build configuration list for PBXNativeTarget "dlt-sort-unittests" */;
+			buildPhases = (
+				AE1FEAB018818CA80040DBD2 /* Sources */,
+				AE1FEAB118818CA80040DBD2 /* Frameworks */,
+				AE1FEAB218818CA80040DBD2 /* CopyFiles */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "dlt-sort-unittests";
+			productName = "dlt-sort-unittests";
+			productReference = AE1FEAB418818CA80040DBD2 /* dlt-sort-unittests */;
 			productType = "com.apple.product-type.tool";
 		};
 /* End PBXNativeTarget section */
@@ -112,6 +166,7 @@
 			projectRoot = "";
 			targets = (
 				AE1806B518732BD700E83589 /* dlt-sort */,
+				AE1FEAB318818CA80040DBD2 /* dlt-sort-unittests */,
 			);
 		};
 /* End PBXProject section */
@@ -122,6 +177,14 @@
 			buildActionMask = 2147483647;
 			files = (
 				AE1806BA18732BD800E83589 /* main.cpp in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AE1FEAB018818CA80040DBD2 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AE1FEAC1188190C90040DBD2 /* main.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -222,6 +285,44 @@
 			};
 			name = Release;
 		};
+		AE1FEABB18818CA80040DBD2 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					/Users/mbehr/Documents/develop/googletest/build,
+				);
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/include,
+					"~/Documents/develop/bmw/dlt-sort/dlt-sort",
+					"~/Documents/develop/bmw/dlt-daemon/include",
+				);
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Debug;
+		};
+		AE1FEABC18818CA80040DBD2 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					/Users/mbehr/Documents/develop/googletest/build,
+				);
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/include,
+					"~/Documents/develop/bmw/dlt-sort/dlt-sort",
+					"~/Documents/develop/bmw/dlt-daemon/include",
+				);
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -242,6 +343,14 @@
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
+		};
+		AE1FEABA18818CA80040DBD2 /* Build configuration list for PBXNativeTarget "dlt-sort-unittests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AE1FEABB18818CA80040DBD2 /* Debug */,
+				AE1FEABC18818CA80040DBD2 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
 		};
 /* End XCConfigurationList section */
 	};

@@ -29,6 +29,7 @@
 		AE1806B918732BD800E83589 /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
 		AE1806BB18732BD800E83589 /* dlt_sort.1 */ = {isa = PBXFileReference; lastKnownFileType = text.man; path = dlt_sort.1; sourceTree = "<group>"; };
 		AE1806C21875FA3600E83589 /* README */ = {isa = PBXFileReference; lastKnownFileType = text; path = README; sourceTree = SOURCE_ROOT; };
+		AE1FEAAF188187740040DBD2 /* dlt-sort.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "dlt-sort.h"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -64,6 +65,7 @@
 				AE1806B918732BD800E83589 /* main.cpp */,
 				AE1806BB18732BD800E83589 /* dlt_sort.1 */,
 				AE1806C21875FA3600E83589 /* README */,
+				AE1FEAAF188187740040DBD2 /* dlt-sort.h */,
 			);
 			path = "dlt-sort";
 			sourceTree = "<group>";
@@ -201,6 +203,7 @@
 					"$(inherited)",
 					/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/include,
 					"~/Documents/develop/bmw/genivi/dlt-daemon/include",
+					"~/Documents/develop/bmw/dlt-sort/dlt-sort",
 				);
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
@@ -213,6 +216,7 @@
 					"$(inherited)",
 					/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/include,
 					"~/Documents/develop/bmw/genivi/dlt-daemon/include",
+					"~/Documents/develop/bmw/dlt-sort/dlt-sort",
 				);
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
@@ -237,6 +241,7 @@
 				AE1806C118732BD800E83589 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};

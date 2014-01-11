@@ -6,6 +6,7 @@
 //  Copyright (c) 2014 Matthias Behr. All rights reserved.
 //
 
+#include <limits>
 #include "dlt-sort.h"
 #include "gtest/gtest.h"
 
@@ -135,22 +136,107 @@ TEST(Lifecycle_Tests, calc_min_time) {
     Lifecycle lc;
     ASSERT_EQ(lc.calc_min_time(), 0);
     lc.usec_begin = 1LL*usecs_per_sec;
+    lc.usec_end = 50LL*usecs_per_sec;
     ASSERT_EQ(lc.calc_min_time(), 1LL*usecs_per_sec);
     lc.min_tmsp = 50; // should not matter
+    lc.rel_offset_valid=true;
     ASSERT_EQ(lc.calc_min_time(), 1LL*usecs_per_sec);
     // LC now begins and ends at second 1
     // now add one message, this should matter as well:
     DltMessage m;
     init_DltMessage(m);
-    // todo
+    m.storageheader->seconds = 43;
+    m.storageheader->microseconds = 0;
+    m.headerextra.tmsp = 9999;
+    ASSERT_TRUE(lc.fitsin(m));
+    // now the min time should be 1s plus 0.9999s:
+    ASSERT_EQ(1999900, lc.calc_min_time());
+    DltMessage m2;
+    init_DltMessage(m2);
+    m2.storageheader->seconds = 43;
+    m2.storageheader->microseconds = 0;
+    m2.headerextra.tmsp = 19999;
+    ASSERT_TRUE(lc.fitsin(m2));
+    // we need to sort the msgs first otherwise calc_min_time might not be valid:
+    lc.msgs.sort(compare_tmsp); // todo we might add a autom. sort into calc_min_time (with an internal variable remembering whether it's already sorted)
+    // now the min time should still be 1s plus 0.9999s:
+    ASSERT_EQ(1999900, lc.calc_min_time());
 }
 
 
 
 TEST(Lifecycle_Tests, expand_if_intersects) {
-    
+    // todo
+    EXPECT_TRUE(false) << "not implemented yet";
 }
 
+TEST(OverallLC, basic_tests) {
+    // todo
+    EXPECT_TRUE(false) << "not implemented yet";
+}
+
+TEST(OverallLC, expand_if_intersects) {
+    // todo
+    EXPECT_TRUE(false) << "not implemented yet";
+}
+
+TEST(OverallLC, output_to_fstream) {
+    // todo
+    EXPECT_TRUE(false) << "not implemented yet";
+}
+
+TEST(Algorithm, process_message) {
+    // todo
+    EXPECT_TRUE(false) << "not implemented yet";
+}
+
+TEST(Algorithm, determine_lcs) {
+    // todo
+    EXPECT_TRUE(false) << "not implemented yet";
+}
+
+TEST(Algorithm, determine_overall_lcs) {
+    // todo
+    EXPECT_TRUE(false) << "not implemented yet";
+}
+
+TEST(Algorithm, merge_lcs) {
+    // todo
+    EXPECT_TRUE(false) << "not implemented yet";
+}
+
+TEST(FileHandling_Tests, process_input) {
+    // todo
+    EXPECT_TRUE(false) << "not implemented yet";
+}
+
+TEST(FileHandling_Tests, output_message) {
+    // todo
+    EXPECT_TRUE(false) << "not implemented yet";
+}
+
+TEST(FileHandling_Tests, get_ofstream_name) {
+    ASSERT_STREQ("/tmp/dLt_test.dlt", get_ofstream_name(0, "/tmp/dLt_test.dlt").c_str());
+    // ignore neg cnt
+    ASSERT_STREQ("/tmp/dLt_test.dlt", get_ofstream_name(-42, "/tmp/dLt_test.dlt").c_str());
+    // no autom. adding of .dlt if cnt==0
+    ASSERT_STREQ("/tmp/dLt_test", get_ofstream_name(0, "/tmp/dLt_test").c_str());
+    // autom. adding of .dlt if cnt!=0
+    ASSERT_STREQ("/tmp/dLt_test042.dlt", get_ofstream_name(42, "/tmp/dLt_test").c_str());
+    // inserting of the cnt even with .dlt if cnt!=0
+    ASSERT_STREQ("/tmp/dLt_test042.dlt", get_ofstream_name(42, "/tmp/dLt_test.dlt").c_str());
+    // inserting of the cnt even with .dlt if cnt!=0
+    ASSERT_STREQ("/tmp/dLt_test.dlt042.dlt", get_ofstream_name(42, "/tmp/dLt_test.dlt.dlt").c_str());
+    // nr >999
+    ASSERT_STREQ("/tmp/dLt_test_1042.dlt", get_ofstream_name(1042, "/tmp/dLt_test_").c_str());
+    // nr <10 gets padded with two 0
+    ASSERT_STREQ("/tmp/dLt_test_002.dlt", get_ofstream_name(2, "/tmp/dLt_test_").c_str());
+    // nr >=100 and <=999 gets padded with no 0
+    ASSERT_STREQ("/tmp/dLt_test_123.dlt", get_ofstream_name(123, "/tmp/dLt_test_").c_str());
+    // MAX_INT doesn't lead to a mem corruption:
+    ASSERT_EQ(2147483647, std::numeric_limits<int>::max());
+    ASSERT_STREQ("/tmp/dLt_test_2147483647.dlt", get_ofstream_name(std::numeric_limits<int>::max(), "/tmp/dLt_test_").c_str());
+}
 
 
 int main(int argc, char **argv){

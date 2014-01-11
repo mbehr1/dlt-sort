@@ -10,6 +10,9 @@
 #define dlt_sort_dlt_sort_h
 
 #include <assert.h>
+#include <time.h> // for ctime
+#include <string.h> // for memcpy and snprintf
+#include <stdlib.h> // for abort
 #include <algorithm> // for min
 #include <iostream>
 #include <fstream>
@@ -19,6 +22,10 @@
 #include <vector>
 
 #include <dlt/dlt_common.h>
+
+#ifdef WIN32 // M$ doesnt seem to like (yet) snprintf
+#define snprintf _snprintf_s
+#endif
 
 const long usecs_per_sec = 1000000L;
 extern int verbose;

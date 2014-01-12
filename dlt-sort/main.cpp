@@ -6,17 +6,9 @@
 //  Copyright (c) 2013, 2014 Matthias Behr. All rights reserved.
 //
 
-#include <stdlib.h> // for abort
-#include <string.h> // for memcpy
-#include <time.h>
-
 #include <getopt.h>
 
 #include "dlt-sort.h"
-
-#ifdef WIN32 // M$ doesnt seem to like (yet) snprintf
-#define snprintf _snprintf_s
-#endif
 
 using namespace std;
 

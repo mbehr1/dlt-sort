@@ -163,54 +163,52 @@ TEST(Lifecycle_Tests, calc_min_time) {
     ASSERT_EQ(1999900, lc.calc_min_time());
 }
 
-
-
-TEST(Lifecycle_Tests, expand_if_intersects) {
+TEST(Lifecycle_Tests, DISABLED_expand_if_intersects) {
     // todo
     EXPECT_TRUE(false) << "not implemented yet";
 }
 
-TEST(OverallLC, basic_tests) {
+TEST(OverallLC, DISABLED_basic_tests) {
     // todo
     EXPECT_TRUE(false) << "not implemented yet";
 }
 
-TEST(OverallLC, expand_if_intersects) {
+TEST(OverallLC, DISABLED_expand_if_intersects) {
     // todo
     EXPECT_TRUE(false) << "not implemented yet";
 }
 
-TEST(OverallLC, output_to_fstream) {
+TEST(OverallLC, DISABLED_output_to_fstream) {
     // todo
     EXPECT_TRUE(false) << "not implemented yet";
 }
 
-TEST(Algorithm, process_message) {
+TEST(Algorithm, DISABLED_process_message) {
     // todo
     EXPECT_TRUE(false) << "not implemented yet";
 }
 
-TEST(Algorithm, determine_lcs) {
+TEST(Algorithm, DISABLED_determine_lcs) {
     // todo
     EXPECT_TRUE(false) << "not implemented yet";
 }
 
-TEST(Algorithm, determine_overall_lcs) {
+TEST(Algorithm, DISABLED_determine_overall_lcs) {
     // todo
     EXPECT_TRUE(false) << "not implemented yet";
 }
 
-TEST(Algorithm, merge_lcs) {
+TEST(Algorithm, DISABLED_merge_lcs) {
     // todo
     EXPECT_TRUE(false) << "not implemented yet";
 }
 
-TEST(FileHandling_Tests, process_input) {
+TEST(FileHandling_Tests, DISABLED_process_input) {
     // todo
     EXPECT_TRUE(false) << "not implemented yet";
 }
 
-TEST(FileHandling_Tests, output_message) {
+TEST(FileHandling_Tests, DISABLED_output_message) {
     // todo
     EXPECT_TRUE(false) << "not implemented yet";
 }

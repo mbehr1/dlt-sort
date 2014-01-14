@@ -12,7 +12,7 @@
 
 using namespace std;
 
-const char* const dlt_sort_version="0.9";
+const char* const dlt_sort_version="1.0";
 
 void print_usage()
 {

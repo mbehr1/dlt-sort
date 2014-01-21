@@ -28,6 +28,11 @@
 #endif
 
 const long usecs_per_sec = 1000000L;
+
+// the header versions supported: (currently just 1)
+const int DLT_HEADER_VERSION_MIN = 1;
+const int DLT_HEADER_VERSION_MAX = 1;
+
 extern int verbose;
 
 /* type definitions */

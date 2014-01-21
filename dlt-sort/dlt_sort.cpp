@@ -250,14 +250,13 @@ int process_input(std::ifstream &fin)
                 // verify header:
                 // check version
                 int header_version = (msg->standardheader->htyp & DLT_HTYP_VERS) >> 5; // need a constant for 5
-                if (header_version<1){
-                    cerr << "msg #" << nr_msgs << " has no header version. skipping! ";
+                if ((header_version<DLT_HEADER_VERSION_MIN) || (header_version > DLT_HEADER_VERSION_MAX)){
+                    cerr << "msg #" << nr_msgs << " has wrong header version (" << header_version << "). skipping! ";
                 }else{
-                    
                     uint16_t len = DLT_BETOH_16(msg->standardheader->len); // why that? the macro should work! DLT_ENDIAN_GET_16(hstd.htyp, hstd.len); // len is without storage header (but with stdh)
                     if (len<=sizeof(*msg->standardheader)){
-                        cerr << "msg len <= sizeof(DltStandardHeader). Stopping processing this file!\n";
-                        remaining = -4;
+                        cerr << "msg len (" << len << ") <= sizeof(DltStandardHeader). skipping!\n";
+                        // keep remaining untouched. pattern search will find next msg
                     }else{
                         len -= sizeof(*msg->standardheader); // standard header already read from this message
                         

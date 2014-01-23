@@ -56,6 +56,7 @@ TEST(Lifecycle_Tests, from_DltMessage) {
 }
 
 TEST(Lifecycle_Tests, fitsin) {
+    trust_logger_time=1;
     Lifecycle lc;
     ASSERT_EQ(0, lc.calc_min_time());
     lc.usec_begin = 2LL*usecs_per_sec;
@@ -130,6 +131,9 @@ TEST(Lifecycle_Tests, fitsin) {
     ASSERT_FALSE(lc.fitsin(m));
     ASSERT_EQ(2, lc.msgs.size());
 
+    // now tests for trust_logger_time=0:
+    // todo
+    trust_logger_time=0;
 }
 
 TEST(Lifecycle_Tests, calc_min_time) {

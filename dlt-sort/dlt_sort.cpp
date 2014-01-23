@@ -6,11 +6,16 @@
 //  Copyright (c) 2014 Matthias Behr. All rights reserved.
 //
 
+#include <iomanip>
 #include "dlt-sort.h"
 
 using namespace std;
 
 int verbose = 0;
+int trust_logger_time=0; // by default we don't trust the logger time. see ::fitsin for an example why
+int use_max_earlier_sanity_check=1; // by default enabled.
+int64_t max_earlier_begin_usecs = 120ll*usecs_per_sec; // by default max 2mins
+
 MAP_OF_ECUS map_ecus;
 LIST_OF_OLCS list_olcs;
 
@@ -122,18 +127,47 @@ bool Lifecycle::fitsin(const DltMessage &m)
         && (m_abs_lc_starttime <= usec_end)
         && (m_org_tx >= usec_begin))
     {
-        toret = true;
+        if (use_max_earlier_sanity_check){
+            // I thought it's a 100% safe check but we seem to have to instances with corrupted timestamps
+            // this sometimes moves the begin of a lifecycle completely to a lot earlier.
+            // so we add a max delta check here:
+            if ((new_usec_begin + max_earlier_begin_usecs) > usec_begin)
+                toret = true;
+            else{
+                if (verbose>=1) debug_print_message(m);
+                cerr << "! max_earlier_begin_usecs check failed! (tmsp " << m.headerextra.tmsp << " corrupt?. Ignoring this msg!\n";
+                return true; // mark it as fitting into this lifecycle but ignoring the message!
+            }
+        }else{
+            toret = true;
+        }
     }
     
     if (toret){
         // ok belongs to this one.
         if (new_usec_begin<usec_begin) usec_begin = new_usec_begin;
         
-        // to determine/extend the end of the lifecycle we can use the
-        // abs time when the message was received by the logger as
-        // processing jitter can not occur between lifecycles
-        if (m_org_tx>usec_end)
-            usec_end = m_org_tx;
+        if (trust_logger_time) { // due to some logger faults we can't trust the m_org_tx time
+            // to determine/extend the end of the lifecycle we can use the
+            // abs time when the message was received by the logger as
+            // processing jitter can not occur between lifecycles
+            if (m_org_tx>usec_end)
+                usec_end = m_org_tx;
+        }else{
+            // to determine/extend the end of the lifecycle we use the
+            // usec_begin (probably adjusted by this msg) and the
+            // timestamp from this message. I.e. we don't trust the logger time
+            // this will lead to more lifecycles detected but that's better
+            // than detecting them wrongly in the previous lifecycle
+            // example:
+            // [ECUX] 7189760 2014/01/17 18:20:03.924584 54 40 16
+            // [ECUX] 7189790 2014/01/17 18:20:06.968501 54 38 18 <- logger wrongly uses the timestamp of the next msg (or first char of the next msg) here.
+            // [ECUX]      50 2014/01/17 18:20:06.968515 54 0 20
+            int64_t m_new_tx = usec_begin + msg_timestamp;
+            if (m_new_tx > usec_end)
+                usec_end = m_new_tx;
+
+        }
         
         msgs.push_back((DltMessage *)&m);
         
@@ -368,6 +402,8 @@ int process_message(DltMessage *msg)
 	memcpy (&ecu_i, ecu, sizeof(ecu_i));
     LIST_OF_MSGS &list_of_msg = map_ecus[ecu_i].msgs;
     list_of_msg.push_back(msg);
+    if (verbose>=3)
+        debug_print_message(*msg);
     
     return 0; // success
 }
@@ -732,4 +768,23 @@ std::ofstream *get_ofstream(int cnt, std::string const &templ)
         abort();
     }
     return f;
+}
+
+void debug_print_message(const DltMessage &msg)
+{
+    char ecu[5];
+    ecu[4]=0;
+    memcpy(ecu, msg.headerextra.ecu, 4);
+    
+    cout << "[" << ecu << "] " <<  msg.headerextra.tmsp;
+
+    time_t sbeg;
+    sbeg = msg.storageheader->seconds;
+    char buf[100];
+    strftime(buf, 99, "%Y/%m/%d %H:%M:%S", localtime(&sbeg));
+    
+    cout << " " << buf << "." << setw(6) << msg.storageheader->microseconds <<
+        " " << (int)msg.standardheader->htyp <<
+        " " << (int)msg.standardheader->mcnt <<
+        " " << DLT_BETOH_16(msg.standardheader->len) << endl;
 }

@@ -12,7 +12,7 @@
 
 using namespace std;
 
-const char* const dlt_sort_version="1.1";
+const char* const dlt_sort_version="1.2";
 
 void print_usage()
 {
@@ -20,6 +20,7 @@ void print_usage()
     cout << " -s --split    split output file automatically one for each lifecycle\n";
     cout << " -f --file outputfilename (default dlt_sorted.dlt). If split is active xxx.dlt will be added automatically.\n";
     cout << " -t --timestamps adjust time in storageheader to detected lifecycle time. Changes the orig. logs!\n";
+    cout << "--disable_check_max_earlier disable a sanity check for corrupted timestamps (needs to be disabled if logger latency >120s!\n";
     cout << " -h --help     show usage/help\n";
     cout << " -v --verbose  set verbose level to 1 (increase by adding more -v)\n";
 }
@@ -42,6 +43,7 @@ int main(int argc, char * argv[])
     {
         /* These options set a flag. */
         {"verbose", no_argument,       &verbose, 1},
+        {"disable_check_max_earlier", no_argument, &use_max_earlier_sanity_check, 0},
         // {"brief",   no_argument,       &verbose_flag, 0},
         /* These options don't set a flag.
          We distinguish them by their indices. */
@@ -97,6 +99,8 @@ int main(int argc, char * argv[])
     // print some verbose infos:
     if (verbose){
         cout << " set verbose level to " << verbose << endl;
+        if (!use_max_earlier_sanity_check)
+            cout << " disabled check max_earlier\n";
     }
     
     // let's process the input files:

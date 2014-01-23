@@ -34,6 +34,9 @@ const int DLT_HEADER_VERSION_MIN = 1;
 const int DLT_HEADER_VERSION_MAX = 1;
 
 extern int verbose;
+extern int trust_logger_time;
+extern int use_max_earlier_sanity_check;
+extern int64_t max_earlier_begin_usec;
 
 /* type definitions */
 
@@ -100,6 +103,7 @@ int merge_lcs(ECU_Info &);
 
 void debug_print(const LIST_OF_LCS &);
 void debug_print(const LIST_OF_OLCS &);
+void debug_print_message(const DltMessage &msg);
 int determine_overall_lcs();
 std::string get_ofstream_name(int cnt, std::string const &templ);
 std::ofstream *get_ofstream(int cnt, std::string const &name);

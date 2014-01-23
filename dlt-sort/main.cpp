@@ -21,6 +21,7 @@ void print_usage()
     cout << " -f --file outputfilename (default dlt_sorted.dlt). If split is active xxx.dlt will be added automatically.\n";
     cout << " -t --timestamps adjust time in storageheader to detected lifecycle time. Changes the orig. logs!\n";
     cout << "--disable_check_max_earlier disable a sanity check for corrupted timestamps (needs to be disabled if logger latency >120s!\n";
+    cout << "--trust_logger_timestamp do trust the logger timestamp. Disabled by default (due to some faulty loggers)\n";
     cout << " -h --help     show usage/help\n";
     cout << " -v --verbose  set verbose level to 1 (increase by adding more -v)\n";
 }
@@ -44,7 +45,7 @@ int main(int argc, char * argv[])
         /* These options set a flag. */
         {"verbose", no_argument,       &verbose, 1},
         {"disable_check_max_earlier", no_argument, &use_max_earlier_sanity_check, 0},
-        // {"brief",   no_argument,       &verbose_flag, 0},
+        {"trust_logger_timestamp", no_argument, &trust_logger_time, 1},
         /* These options don't set a flag.
          We distinguish them by their indices. */
         {"split",     no_argument,       0, 's'},
@@ -101,6 +102,8 @@ int main(int argc, char * argv[])
         cout << " set verbose level to " << verbose << endl;
         if (!use_max_earlier_sanity_check)
             cout << " disabled check max_earlier\n";
+        if (trust_logger_time)
+            cout << " enabled trust logger time (as before v1.2)\n";
     }
     
     // let's process the input files:

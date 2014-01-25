@@ -456,6 +456,7 @@ int determine_lcs(ECU_Info &ecu)
     if (ecu.msgs.size()>1){
         LIST_OF_LCS::iterator cur_l = ecu.lcs.begin();
         LIST_OF_MSGS::iterator it = ecu.msgs.begin();
+        DltMessage *prev_msg = *it;
         ++it; // we skip the first msgs as we treated this already above
         for (; it!=ecu.msgs.end(); ++it){
             // to optimize performance we always check with the last matching (cur_l) one:
@@ -470,12 +471,22 @@ int determine_lcs(ECU_Info &ecu)
                 }
                 // create a new lifecycle based on the msg and set l to this one
                 if (!found_other){
+                    if (verbose>=2){
+                        // show the msg that lead to a new lifecycle and the previous one.
+                        if (prev_msg){
+                            cout << "\nprev:";
+                            debug_print_message(*prev_msg);
+                        }
+                        cout << "new :";
+                        debug_print_message(**it);
+                    }
                     Lifecycle new_lc(**it);
                     ecu.lcs.push_back(new_lc); // will be sorted later. so it doesn't matter where we add them
                     cur_l = ecu.lcs.end(); // get the one inserted
                     --cur_l; // end points to a non existing element.
                 }
             } // else fits in cur_l -> next msg
+            prev_msg = *it;
         }
     }
     

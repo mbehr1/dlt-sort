@@ -14,6 +14,8 @@ using namespace std;
 
 const char* const dlt_sort_version="1.2 clock_drift_detection";
 
+void print_usage();
+
 void print_usage()
 {
     cout << "usage dlt-sort [options] input-file input-file ...\n";

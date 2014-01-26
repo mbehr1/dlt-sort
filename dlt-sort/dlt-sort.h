@@ -117,6 +117,7 @@ void debug_print_message(const DltMessage &msg);
 int determine_overall_lcs();
 std::string get_ofstream_name(int cnt, std::string const &templ);
 std::ofstream *get_ofstream(int cnt, std::string const &name);
+int64_t multiply(int64_t a, double b);
 
 extern MAP_OF_ECUS map_ecus;
 extern LIST_OF_OLCS list_olcs;

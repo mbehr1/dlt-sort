@@ -198,7 +198,7 @@ int64_t Lifecycle::calc_min_time() const
     // now add the time from the first msg:
     if (msgs.size()){
         DltMessage *m = *msgs.begin();
-        ret+=(((int64_t)m->headerextra.tmsp) * usecs_per_tmsp)*clock_skew;
+        ret+=multiply(((int64_t)m->headerextra.tmsp) * usecs_per_tmsp, clock_skew);
     }
     
     return ret;
@@ -216,7 +216,7 @@ int64_t Lifecycle::determine_max_latency(int64_t begin, double skew) const
         DltMessage *m = *it;
         int64_t latency=(usecs_per_sec*m->storageheader->seconds)+m->storageheader->microseconds;
         latency -= begin;
-        latency -= (usecs_per_tmsp*m->headerextra.tmsp)*skew; // we don't use the internal clock_skew here
+        latency -= multiply((usecs_per_tmsp*m->headerextra.tmsp), skew); // we don't use the internal clock_skew here
         if (latency<0) return latency; // error, return it
         if (latency>ret) ret=latency;
     }
@@ -230,7 +230,7 @@ int64_t Lifecycle::determine_begin (double skew) const
     for(LIST_OF_MSGS::const_iterator it=msgs.begin(); it!=msgs.end(); ++it){
         DltMessage *m = *it;
         int64_t begin=(usecs_per_sec*m->storageheader->seconds)+m->storageheader->microseconds;
-        begin -= (usecs_per_tmsp*m->headerextra.tmsp) * skew;
+        begin -= multiply(usecs_per_tmsp*m->headerextra.tmsp, skew);
         if (begin<ret) ret=begin;
     }
     return ret;
@@ -238,8 +238,7 @@ int64_t Lifecycle::determine_begin (double skew) const
 
 int64_t Lifecycle::determine_end() const
 {
-    int64_t ret = max_tmsp;
-    ret *= clock_skew;
+    int64_t ret = multiply(max_tmsp, clock_skew);
     ret += usec_begin;
     return ret;
 }
@@ -511,7 +510,7 @@ int process_input(std::ifstream &fin)
                 remaining -= 1;
                 skipped_bytes++;
             }
-        }while (!found_pattern && remaining>=((int64_t)sizeof(DltStorageHeader)-sizeof(pattern)));
+        }while (!found_pattern && remaining>=static_cast<int64_t>(((int64_t)sizeof(DltStorageHeader)-sizeof(pattern))));
         
         if (found_pattern){
             
@@ -523,7 +522,7 @@ int process_input(std::ifstream &fin)
             fin.read(((char*)msg->storageheader)+sizeof(pattern), sizeof(*msg->storageheader)-sizeof(pattern));
             remaining-= sizeof(*msg->storageheader)-sizeof(pattern);
             // now read dlt header:
-            if (remaining >= sizeof(*msg->standardheader)){
+            if (remaining >= static_cast<int64_t>(sizeof(*msg->standardheader))){
                 fin.read((char*)msg->standardheader, sizeof(*msg->standardheader));
                 remaining -= sizeof(*msg->standardheader);
                 // verify header:
@@ -905,11 +904,10 @@ bool OverallLC::output_to_fstream(std::ofstream &f, bool timeadjust)
         // now output msgs from index until time >next time:
         do{
             DltMessage *msg=*(index->it);
-            int64_t tmsp = usecs_per_tmsp*((int64_t)(msg->headerextra.tmsp)); // this needs to be done before output_message!
-            tmsp *= index->clock_skew;
+            int64_t tmsp = multiply((int64_t)(msg->headerextra.tmsp)*usecs_per_tmsp, index->clock_skew); // this needs to be done before output_message!
             if (timeadjust){
                 // change the DltMessage
-                int64_t t = index->usec_begin + ((((int64_t)msg->headerextra.tmsp) * usecs_per_tmsp)*index->clock_skew);
+                int64_t t = index->usec_begin + multiply((((int64_t)msg->headerextra.tmsp) * usecs_per_tmsp),index->clock_skew);
                 msg->storageheader->seconds = (uint32_t)(t / usecs_per_sec);
                 msg->storageheader->microseconds = t % usecs_per_sec;
             }
@@ -919,7 +917,7 @@ bool OverallLC::output_to_fstream(std::ofstream &f, bool timeadjust)
                 msg = *(index->it); // in case somebody uses it from now on.
                 // update LC_it
                 index->min_time -= tmsp;
-                index->min_time += (usecs_per_tmsp*((int64_t)(msg->headerextra.tmsp)))*index->clock_skew;
+                index->min_time += multiply(usecs_per_tmsp*((int64_t)(msg->headerextra.tmsp)), index->clock_skew);
             }else{
 				msg = NULL; // in case somebody uses it
                 // emptied this lc! we need to delete this element
@@ -955,7 +953,7 @@ bool OverallLC::output_to_fstream(std::ofstream &f, bool timeadjust)
             DltMessage *msg = *(l.it);
             if (timeadjust){
                 // change the DltMessage
-                int64_t t = l.usec_begin + ((((int64_t)msg->headerextra.tmsp) * usecs_per_tmsp)*l.clock_skew);
+                int64_t t = l.usec_begin + multiply(usecs_per_tmsp*((int64_t)msg->headerextra.tmsp), l.clock_skew);
                 msg->storageheader->seconds = (uint32_t)(t / usecs_per_sec);
                 msg->storageheader->microseconds = t % usecs_per_sec;
             }
@@ -1045,4 +1043,19 @@ void debug_print_message(const DltMessage &msg)
         " " << (int)msg.standardheader->htyp <<
         " " << (int)msg.standardheader->mcnt <<
         " " << DLT_BETOH_16(msg.standardheader->len) << endl;
+}
+
+int64_t multiply(int64_t a, double b)
+{
+    // we do a special multiplication here to avoid rounding errors
+    // we multiply assuming that the upper 15bits are not used (as this would
+    // be really huge times presented even in usecs.
+    // todo we could further optimize as we know that 0.5 <= b <= 1.5
+    const int shift_bits=15;
+    assert((a >> (63-shift_bits))==0);
+    
+    uint m = static_cast<uint>((1u<<shift_bits) * b);
+    a *=m;
+    a >>= shift_bits;
+    return a;
 }

@@ -27,7 +27,8 @@
 #define snprintf _snprintf_s
 #endif
 
-const long usecs_per_sec = 1000000L;
+const int64_t usecs_per_sec = 1000000;
+const int64_t usecs_per_tmsp = 100;
 
 // the header versions supported: (currently just 1)
 const int DLT_HEADER_VERSION_MIN = 1;
@@ -44,11 +45,16 @@ typedef std::list<DltMessage *> LIST_OF_MSGS;
 
 class Lifecycle{
 public:
-    Lifecycle() : usec_begin(0), usec_end(0), rel_offset_valid(false), min_tmsp(0), max_tmsp(0) {};
+    Lifecycle() : usec_begin(0), usec_end(0), rel_offset_valid(false), min_tmsp(0), max_tmsp(0), clock_skew(1.0f) {};
     Lifecycle(const DltMessage &);
     void debug_print() const;
     bool fitsin(const DltMessage &); // function is non const. modifies the lifecycle
+    void set_clock_skew(double new_skew); // non const! adjusts even usec_begin, usec_end
     int64_t calc_min_time() const;
+    int64_t determine_max_latency(int64_t begin=-1, double skew=-1.0) const;
+    double determine_clock_skew() const;
+    int64_t determine_begin (double skew) const;
+    int64_t determine_end () const;
     bool expand_if_intersects(Lifecycle &l);
     // member vars:
     int64_t usec_begin; // secs since 1.1.1970 for begin of LC
@@ -57,6 +63,8 @@ public:
     bool rel_offset_valid;
     uint32_t min_tmsp;
     uint32_t max_tmsp;
+    // clock skew support:
+    double clock_skew;
     
 };
 typedef std::list<Lifecycle> LIST_OF_LCS;
@@ -96,6 +104,7 @@ int process_input(std::ifstream &);
 int process_message(DltMessage *msg);
 int output_message(DltMessage *msg, std::ofstream &f);
 int determine_lcs(ECU_Info &);
+void determine_clock_skew(ECU_Info &);
 bool compare_tmsp(const DltMessage *first, const DltMessage *second);
 int sort_msgs_lcs(ECU_Info &);
 bool compare_usecbegin(const OverallLC &first, const OverallLC &second);

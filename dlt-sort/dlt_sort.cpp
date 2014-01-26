@@ -7,6 +7,7 @@
 //
 
 #include <iomanip>
+#include <limits>
 #include "dlt-sort.h"
 
 using namespace std;
@@ -31,6 +32,7 @@ void init_DltMessage(DltMessage &msg){
 
 Lifecycle::Lifecycle(const DltMessage &m)
 {
+    clock_skew = 1.0f;
     usec_begin = m.storageheader->seconds;
     usec_begin *= usecs_per_sec;
     usec_begin += m.storageheader->microseconds;
@@ -38,7 +40,7 @@ Lifecycle::Lifecycle(const DltMessage &m)
     if (m.headerextra.tmsp){
         min_tmsp = m.headerextra.tmsp;
         max_tmsp = min_tmsp;
-        usec_begin -= (((int64_t)m.headerextra.tmsp) * 100LL); // tmsp is in 0.1ms granularity. The lifecycle started at least the cpu runtime before
+        usec_begin -= (((int64_t)m.headerextra.tmsp) * usecs_per_tmsp); // tmsp is in 0.1ms granularity. The lifecycle started at least the cpu runtime before
         rel_offset_valid=true;
     }else{
         rel_offset_valid=false;
@@ -90,7 +92,7 @@ bool Lifecycle::fitsin(const DltMessage &m)
     }
     
     // msg tmsp in seconds (rounded) (x from above)
-    int64_t msg_timestamp = (((int64_t)m.headerextra.tmsp) *100LL);
+    int64_t msg_timestamp = (((int64_t)m.headerextra.tmsp) *usecs_per_tmsp);
     // this would be the starttime if the processing time/jitter j would be 0. (sh_tx-x)
     int64_t m_abs_lc_starttime = (((int64_t)m.storageheader->seconds) * usecs_per_sec)
     + (m.storageheader->microseconds) - msg_timestamp;
@@ -196,10 +198,250 @@ int64_t Lifecycle::calc_min_time() const
     // now add the time from the first msg:
     if (msgs.size()){
         DltMessage *m = *msgs.begin();
-        ret+=(((int64_t)m->headerextra.tmsp) * 100LL);
+        ret+=(((int64_t)m->headerextra.tmsp) * usecs_per_tmsp)*clock_skew;
     }
     
     return ret;
+}
+
+int64_t Lifecycle::determine_max_latency(int64_t begin, double skew) const
+{
+    int64_t ret=0;
+    if (begin==-1) begin = usec_begin;
+    if (skew<0.0) skew = clock_skew;
+    
+    // latency is the difference between usec_begin+tmsp and storageheader time
+    // here we determine the maximum latency from all msgs
+    for(LIST_OF_MSGS::const_iterator it=msgs.begin(); it!=msgs.end(); ++it){
+        DltMessage *m = *it;
+        int64_t latency=(usecs_per_sec*m->storageheader->seconds)+m->storageheader->microseconds;
+        latency -= begin;
+        latency -= (usecs_per_tmsp*m->headerextra.tmsp)*skew; // we don't use the internal clock_skew here
+        if (latency<0) return latency; // error, return it
+        if (latency>ret) ret=latency;
+    }
+    return ret;
+}
+
+int64_t Lifecycle::determine_begin (double skew) const
+{
+    int64_t ret=std::numeric_limits<int64_t>::max();
+    // what would the new begin be if we had a clock skew?
+    for(LIST_OF_MSGS::const_iterator it=msgs.begin(); it!=msgs.end(); ++it){
+        DltMessage *m = *it;
+        int64_t begin=(usecs_per_sec*m->storageheader->seconds)+m->storageheader->microseconds;
+        begin -= (usecs_per_tmsp*m->headerextra.tmsp) * skew;
+        if (begin<ret) ret=begin;
+    }
+    return ret;
+}
+
+int64_t Lifecycle::determine_end() const
+{
+    int64_t ret = max_tmsp;
+    ret *= clock_skew;
+    ret += usec_begin;
+    return ret;
+}
+
+void determine_clock_skew(ECU_Info &ecu)
+{
+    if (ecu.lcs.size()==0) return;
+    if (ecu.msgs.size()==0) return;
+
+    double skew_min = 0.5;
+    double skew_max = 1.5;
+    double r_skew=1.25; // >1 = ECU clock is faster than logger clock
+    double l_skew = 0.75;
+    // do a binary search with skew. between 0.5 and 1.5, 1.25|1.75,...
+    // at 1 is known = determine_max_latency()
+    // optimize with max_latency so that it's >=0 but as small as possible
+    
+    // 1. determine max_latency for all lcs at skew 1.0:
+    int64_t last_lat = 0;
+    for (LIST_OF_LCS::const_iterator it=ecu.lcs.begin(); it!=ecu.lcs.end(); ++it){
+        int64_t lat = (*it).determine_max_latency();
+        if (lat>last_lat)
+            last_lat = lat;
+    }
+    double last_skew = 1.0;
+    int i=20; // iterations
+    do{
+        int64_t r_lat=0;
+        for (LIST_OF_LCS::const_iterator it=ecu.lcs.begin(); it!=ecu.lcs.end(); ++it){
+            int64_t r_beg = (*it).determine_begin(r_skew);
+            int64_t t_lat = (*it).determine_max_latency(r_beg, r_skew);
+            if (t_lat<0){
+                r_lat = t_lat;
+                break;
+            }
+            if (t_lat>r_lat)
+                r_lat = t_lat;
+        }
+
+        if (r_lat<0){
+            // this direction is invalid!
+            skew_max=r_skew;
+        }
+        
+        int64_t l_lat=0;
+        for (LIST_OF_LCS::const_iterator it=ecu.lcs.begin(); it!=ecu.lcs.end(); ++it){
+            int64_t l_beg = (*it).determine_begin(l_skew);
+            int64_t t_lat = (*it).determine_max_latency(l_beg, l_skew);
+            if (t_lat<0){
+                l_lat = t_lat;
+                break;
+            }
+            if (t_lat>l_lat)
+                l_lat = t_lat;
+        }
+        if (l_lat<0){
+            skew_min = l_skew;
+        }
+        if (verbose>=3)cout << l_skew << "=" << l_lat << " " << r_skew << "=" << r_lat << endl;
+
+        // now decide which direction is better:
+        if (r_lat<0 && l_lat<0){
+            r_skew = last_skew+skew_max;
+            r_skew /=2.0;
+            l_skew = last_skew+skew_min;
+            l_skew /=2.0;
+        }else{
+            // not both dirs invalid:
+            if (l_lat<0){
+                l_skew = last_skew + skew_min;
+                l_skew /=2.0;
+            }else{
+                // l_lat ok. better?
+                if (l_lat < last_lat){
+                    // good direction:
+                    last_skew = l_skew;
+                    last_lat = l_lat;
+                    l_skew = last_skew + skew_min;
+                    l_skew /=2.0;
+                }else{
+                    skew_min = l_skew;
+                    l_skew = last_skew + skew_min;
+                    l_skew /= 2.0;
+                }
+            }
+            if (r_lat<0){
+                r_skew = last_skew + skew_max;
+                r_skew /=2.0;
+            }else{
+                // r_lat ok. better?
+                if (r_lat < last_lat){
+                    // good direction:
+                    last_skew = r_skew;
+                    last_lat = r_lat;
+                    r_skew = last_skew + skew_max;
+                    r_skew /=2.0;
+                }else{
+                    skew_max = r_skew;
+                    r_skew = last_skew + skew_max;
+                    r_skew /=2.0;
+                }
+            }
+        }
+        --i;
+    }while(i>0);
+    // last_skew contains the optimum:
+    // adjust each lc:
+    //cout << endl;
+    for (LIST_OF_LCS::iterator it=ecu.lcs.begin(); it!=ecu.lcs.end(); ++it){
+        (*it).set_clock_skew(last_skew);
+        //cout << " max latency = " << (*it).determine_max_latency() << endl;
+    }
+
+    if (verbose>=1) cout << "\npossible clock skew = " << ((last_skew-1.0f)*100.0) << "%" << endl;
+
+}
+
+double Lifecycle::determine_clock_skew() const
+{
+    double skew_min = 0.5;
+    double skew_max = 1.5;
+    double r_skew=1.25; // >1 = ECU clock is faster than logger clock
+    double l_skew = 0.75;
+ 
+    
+    // do a binary search with skew. between 0.5 and 1.5, 1.25|1.75,...
+    // at 1 is known = determine_max_latency()
+    // optimize with max_latency so that it's >=0 but as small as possible
+    //assert(determine_begin(1.0)==usec_begin);
+    int64_t last_beg = usec_begin;
+    int64_t last_lat = determine_max_latency(last_beg);
+    if (verbose >=2)cout << endl << "1.0 =" << last_lat << endl;
+    double last_skew = 1.0;
+    int i=20; // iterations
+    do{
+        int64_t r_beg = determine_begin(r_skew);
+        int64_t r_lat = determine_max_latency(r_beg, r_skew);
+        if (r_lat<0){
+            // this direction is invalid!
+            skew_max=r_skew;
+        }
+        int64_t l_beg = determine_begin(l_skew);
+        int64_t l_lat = determine_max_latency(l_beg, l_skew);
+        if (l_lat<0){
+            skew_min = l_skew;
+        }
+        if (verbose>=3)cout << l_skew << "=" << l_lat << " " << r_skew << "=" << r_lat << endl;
+        // now decide which direction is better:
+        if (r_lat<0 && l_lat<0){
+            r_skew = last_skew+skew_max;
+            r_skew /=2.0;
+            l_skew = last_skew+skew_min;
+            l_skew /=2.0;
+        }else{
+            // not both dirs invalid:
+            if (l_lat<0){
+                l_skew = last_skew + skew_min;
+                l_skew /=2.0;
+            }else{
+                // l_lat ok. better?
+                if (l_lat < last_lat){
+                    // good direction:
+                    last_skew = l_skew;
+                    last_lat = l_lat;
+                    l_skew = last_skew + skew_min;
+                    l_skew /=2.0;
+                }else{
+                    skew_min = l_skew;
+                    l_skew = last_skew + skew_min;
+                    l_skew /= 2.0;
+                }
+            }
+            if (r_lat<0){
+                r_skew = last_skew + skew_max;
+                r_skew /=2.0;
+            }else{
+                // r_lat ok. better?
+                if (r_lat < last_lat){
+                    // good direction:
+                    last_skew = r_skew;
+                    last_lat = r_lat;
+                    r_skew = last_skew + skew_max;
+                    r_skew /=2.0;
+                }else{
+                    skew_max = r_skew;
+                    r_skew = last_skew + skew_max;
+                    r_skew /=2.0;
+                }
+            }
+        }
+        --i;
+    }while(i>0);
+    
+    
+    return last_skew;
+}
+
+void Lifecycle::set_clock_skew(double new_skew)
+{
+    usec_begin = determine_begin(new_skew);
+    clock_skew = new_skew;
+    usec_end = determine_end();
 }
 
 bool Lifecycle::expand_if_intersects(Lifecycle &lc)
@@ -230,6 +472,9 @@ void Lifecycle::debug_print() const
     cout << ctime(&send);
     cout << "  min_tmsp=" << min_tmsp << " max_tmsp=" << max_tmsp << endl;
     cout << "  num_msgs = " << msgs.size() << endl;
+    if (verbose>=1)
+        cout << "  max latency = " << determine_max_latency() << endl;
+    // cout << "  possible clock skew = " << ((determine_clock_skew()-1.0f)*100.0) << "%" << endl;
 }
 
 const char DLT_ID4_ID[4] = {'D', 'L', 'T', 0x01};
@@ -659,10 +904,10 @@ bool OverallLC::output_to_fstream(std::ofstream &f, bool timeadjust)
         // now output msgs from index until time >next time:
         do{
             DltMessage *msg=*(index->it);
-            int64_t tmsp = 100LL*((int64_t)(msg->headerextra.tmsp)); // this needs to be done before output_message!
+            int64_t tmsp = usecs_per_tmsp*((int64_t)(msg->headerextra.tmsp)); // this needs to be done before output_message!
             if (timeadjust){
                 // change the DltMessage
-                int64_t t = index->usec_begin + (((int64_t)msg->headerextra.tmsp) * 100LL);
+                int64_t t = index->usec_begin + (((int64_t)msg->headerextra.tmsp) * usecs_per_tmsp);
                 msg->storageheader->seconds = (uint32_t)(t / usecs_per_sec);
                 msg->storageheader->microseconds = t % usecs_per_sec;
             }
@@ -672,7 +917,7 @@ bool OverallLC::output_to_fstream(std::ofstream &f, bool timeadjust)
                 msg = *(index->it); // in case somebody uses it from now on.
                 // update LC_it
                 index->min_time -= tmsp;
-                index->min_time += 100LL*((int64_t)(msg->headerextra.tmsp));
+                index->min_time += usecs_per_tmsp*((int64_t)(msg->headerextra.tmsp));
             }else{
 				msg = NULL; // in case somebody uses it
                 // emptied this lc! we need to delete this element
@@ -708,7 +953,7 @@ bool OverallLC::output_to_fstream(std::ofstream &f, bool timeadjust)
             DltMessage *msg = *(l.it);
             if (timeadjust){
                 // change the DltMessage
-                int64_t t = l.usec_begin + (((int64_t)msg->headerextra.tmsp) * 100LL);
+                int64_t t = l.usec_begin + (((int64_t)msg->headerextra.tmsp) * usecs_per_tmsp);
                 msg->storageheader->seconds = (uint32_t)(t / usecs_per_sec);
                 msg->storageheader->microseconds = t % usecs_per_sec;
             }

@@ -148,8 +148,11 @@ int main(int argc, char * argv[])
         cout << "ECU <" << ecu << "> contains " << nr_lcs << " lifecycle\n";
         debug_print(info.lcs);
         
-        // now see whether they overall (the detection does not always work 100%
-        // esp. on short lifecycles:
+        // determine clock skew per ecu:
+        determine_clock_skew(info);
+        
+        // now see whether they overlap (the detection does not always work 100%
+        // esp. on short lifecycles):
         merge_lcs(info);
         sort_msgs_lcs(info);
         if (info.lcs.size() != nr_lcs){

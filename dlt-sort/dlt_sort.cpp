@@ -361,7 +361,7 @@ double Lifecycle::determine_clock_skew() const
 {
     double skew_min = 0.5;
     double skew_max = 1.5;
-    double r_skew=1.25; // >1 = ECU clock is faster than logger clock
+    double r_skew=1.25; // <1 = ECU clock is faster than logger clock (we need to slow down the tmsps)
     double l_skew = 0.75;
  
     
@@ -870,6 +870,7 @@ bool OverallLC::output_to_fstream(std::ofstream &f, bool timeadjust)
         l.end = (*it).msgs.end();
         l.min_time= (*it).calc_min_time();
         l.usec_begin = (*it).usec_begin;
+        l.clock_skew = (*it).clock_skew;
         vec.push_back(l);
     }
     while(vec.size()>1){ // as long as we have at least two msg lists to take care of:
@@ -905,9 +906,10 @@ bool OverallLC::output_to_fstream(std::ofstream &f, bool timeadjust)
         do{
             DltMessage *msg=*(index->it);
             int64_t tmsp = usecs_per_tmsp*((int64_t)(msg->headerextra.tmsp)); // this needs to be done before output_message!
+            tmsp *= index->clock_skew;
             if (timeadjust){
                 // change the DltMessage
-                int64_t t = index->usec_begin + (((int64_t)msg->headerextra.tmsp) * usecs_per_tmsp);
+                int64_t t = index->usec_begin + ((((int64_t)msg->headerextra.tmsp) * usecs_per_tmsp)*index->clock_skew);
                 msg->storageheader->seconds = (uint32_t)(t / usecs_per_sec);
                 msg->storageheader->microseconds = t % usecs_per_sec;
             }
@@ -917,7 +919,7 @@ bool OverallLC::output_to_fstream(std::ofstream &f, bool timeadjust)
                 msg = *(index->it); // in case somebody uses it from now on.
                 // update LC_it
                 index->min_time -= tmsp;
-                index->min_time += usecs_per_tmsp*((int64_t)(msg->headerextra.tmsp));
+                index->min_time += (usecs_per_tmsp*((int64_t)(msg->headerextra.tmsp)))*index->clock_skew;
             }else{
 				msg = NULL; // in case somebody uses it
                 // emptied this lc! we need to delete this element
@@ -953,7 +955,7 @@ bool OverallLC::output_to_fstream(std::ofstream &f, bool timeadjust)
             DltMessage *msg = *(l.it);
             if (timeadjust){
                 // change the DltMessage
-                int64_t t = l.usec_begin + (((int64_t)msg->headerextra.tmsp) * usecs_per_tmsp);
+                int64_t t = l.usec_begin + ((((int64_t)msg->headerextra.tmsp) * usecs_per_tmsp)*l.clock_skew);
                 msg->storageheader->seconds = (uint32_t)(t / usecs_per_sec);
                 msg->storageheader->microseconds = t % usecs_per_sec;
             }

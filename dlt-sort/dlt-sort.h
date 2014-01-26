@@ -95,6 +95,7 @@ typedef struct{
     LIST_OF_MSGS::iterator end;
     int64_t min_time;
     int64_t usec_begin;
+    double clock_skew;
 } LC_it;
 typedef std::vector<LC_it> VEC_OF_LC_it;
 

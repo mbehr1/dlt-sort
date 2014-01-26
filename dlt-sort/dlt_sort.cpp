@@ -1054,7 +1054,7 @@ int64_t multiply(int64_t a, double b)
     const int shift_bits=15;
     assert((a >> (63-shift_bits))==0);
     
-    uint m = static_cast<uint>((1u<<shift_bits) * b);
+    unsigned int m = static_cast<unsigned int>((1u<<shift_bits) * b);
     a *=m;
     a >>= shift_bits;
     return a;

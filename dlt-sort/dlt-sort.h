@@ -38,6 +38,7 @@ extern int verbose;
 extern int trust_logger_time;
 extern int use_max_earlier_sanity_check;
 extern int64_t max_earlier_begin_usec;
+extern int use_clock_drift_detection;
 
 /* type definitions */
 

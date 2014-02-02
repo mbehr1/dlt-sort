@@ -16,6 +16,7 @@ int verbose = 0;
 int trust_logger_time=0; // by default we don't trust the logger time. see ::fitsin for an example why
 int use_max_earlier_sanity_check=1; // by default enabled.
 int64_t max_earlier_begin_usecs = 120ll*usecs_per_sec; // by default max 2mins
+int use_clock_drift_detection=1; // by default enabled.
 
 MAP_OF_ECUS map_ecus;
 LIST_OF_OLCS list_olcs;

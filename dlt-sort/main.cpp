@@ -12,7 +12,7 @@
 
 using namespace std;
 
-const char* const dlt_sort_version="1.2 clock_drift_detection";
+const char* const dlt_sort_version="1.3";
 
 void print_usage();
 
@@ -23,6 +23,7 @@ void print_usage()
     cout << " -f --file outputfilename (default dlt_sorted.dlt). If split is active xxx.dlt will be added automatically.\n";
     cout << " -t --timestamps adjust time in storageheader to detected lifecycle time. Changes the orig. logs!\n";
     cout << "--disable_check_max_earlier disable a sanity check for corrupted timestamps (needs to be disabled if logger latency >120s!\n";
+    cout << "--disable_clock_drift disable clock drift detection\n";
     cout << "--trust_logger_timestamp do trust the logger timestamp. Disabled by default (due to some faulty loggers)\n";
     cout << " -h --help     show usage/help\n";
     cout << " -v --verbose  set verbose level to 1 (increase by adding more -v)\n";
@@ -47,6 +48,7 @@ int main(int argc, char * argv[])
         /* These options set a flag. */
         {"verbose", no_argument,       &verbose, 1},
         {"disable_check_max_earlier", no_argument, &use_max_earlier_sanity_check, 0},
+        {"disable_clock_drift", no_argument, &use_clock_drift_detection, 0},
         {"trust_logger_timestamp", no_argument, &trust_logger_time, 1},
         /* These options don't set a flag.
          We distinguish them by their indices. */
@@ -106,6 +108,8 @@ int main(int argc, char * argv[])
             cout << " disabled check max_earlier\n";
         if (trust_logger_time)
             cout << " enabled trust logger time (as before v1.2)\n";
+        if (!use_clock_drift_detection)
+            cout << " disabled clock drift detection\n";
     }
     
     // let's process the input files:
@@ -151,7 +155,8 @@ int main(int argc, char * argv[])
         debug_print(info.lcs);
         
         // determine clock skew per ecu:
-        determine_clock_skew(info);
+        if (use_clock_drift_detection)
+            determine_clock_skew(info);
         
         // now see whether they overlap (the detection does not always work 100%
         // esp. on short lifecycles):
@@ -201,7 +206,6 @@ int main(int argc, char * argv[])
             delete m;
         }
     }
-
     
     return 0; // no error (<0 for error)
 }
